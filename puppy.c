@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.19 2005/03/01 13:23:23 purbanec Exp $ */
+/* $Id: puppy.c,v 1.20 2005/03/11 14:38:57 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -82,10 +82,18 @@ void do_hdd_mkdir(int fd, char *path);
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
 void finalStats(__u64 bytes, time_t startTime);
 
+#define E_INVALID_ARGS 1
+#define E_READ_DEVICE 2
+#define E_NOT_TF5000PVR 3
+#define E_SET_INTERFACE 4
+#define E_CLAIM_INTERFACE 5
+#define E_DEVICE_LOCK 6
+#define E_LOCK_FILE 7
+#define E_GLOBAL_LOCK 8
+
 int main(int argc, char *argv[])
 {
     struct usb_device_descriptor devDesc;
-    struct usb_config_descriptor confDesc;
     int fd = -1;
     int r;
 
@@ -97,13 +105,13 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "ERROR: Can not open lock file /tmp/puppy: %s\n",
                 strerror(errno));
-        return 7;
+        return E_LOCK_FILE;
     }
     
     r = parseArgs(argc, argv);
     if(r != 0)
     {
-        return 1;
+        return E_INVALID_ARGS;
     }
 
     /* Create a lock, so that other instances of puppy can detect this one. */
@@ -111,7 +119,7 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "ERROR: Can not obtain shared lock on /tmp/puppy: %s\n",
                 strerror(errno));
-        return 8;
+        return E_GLOBAL_LOCK;
     }
 
     trace(1, fprintf(stderr, "cmd %04x on %s\n", cmd, devPath));
@@ -121,15 +129,31 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "ERROR: Can not open %s for read/write: %s\n",
                 devPath, strerror(errno));
-        return 1;
+        return E_READ_DEVICE;
     }
     
     if(0 != flock(fd, LOCK_EX | LOCK_NB))
     {
         fprintf(stderr, "ERROR: Can not get exclusive lock on %s\n", devPath);
         close(fd);
-        return 6;
+        return E_DEVICE_LOCK;
     }
+
+    r = read_device_descriptor(fd, &devDesc);
+    if(r < 0)
+    {
+        close(fd);
+        return E_READ_DEVICE;
+    }
+
+    if(!isToppy(&devDesc))
+    {
+        fprintf(stderr, "ERROR: Could not find a Topfield TF5000PVRt\n");
+        close(fd);
+        return E_NOT_TF5000PVR;
+    }
+
+    trace(1, fprintf(stderr, "Found a Topfield TF5000PVRt\n"));
 
     {
         int interface = 0;
@@ -140,31 +164,21 @@ int main(int argc, char *argv[])
             fprintf(stderr, "ERROR: Can not claim interface 0: %s\n",
                     strerror(errno));
             close(fd);
-            return 5;
+            return E_CLAIM_INTERFACE;
         }
     }
 
-    r = read_device_descriptor(fd, &devDesc);
-    if(r < 0)
     {
-        close(fd);
-        return 2;
-    }
+      struct usbdevfs_setinterface interface0 = {0, 0};
 
-    if(!isToppy(&devDesc))
-    {
-        fprintf(stderr, "ERROR: Could not find a Topfield TF5000PVRt\n");
-        close(fd);
-        return 3;
-    }
-
-    trace(1, fprintf(stderr, "Found a Topfield TF5000PVRt\n"));
-
-    r = read_config_descriptor(fd, &confDesc);
-    if(r < 0)
-    {
-        close(fd);
-        return 4;
+      r = ioctl(fd, USBDEVFS_SETINTERFACE, &interface0);
+      if(r < 0)
+	{
+	  fprintf(stderr, "ERROR: Can not set interface zero: %s\n",
+		  strerror(errno));
+	  close(fd);
+	  return E_SET_INTERFACE;
+	}
     }
 
     switch (cmd)
@@ -210,6 +224,12 @@ int main(int argc, char *argv[])
 
         default:
             fprintf(stderr, "BUG: Command 0x%08x not implemented\n", cmd);
+    }
+
+    {
+        int interface = 0;
+        ioctl(fd, USBDEVFS_RELEASEINTERFACE, &interface);
+	close(fd);
     }
     return 0;
 }
