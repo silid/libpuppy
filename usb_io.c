@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.10 2004/12/23 12:06:06 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.11 2005/01/04 14:15:04 purbanec Exp $ */
 
 /*
 
@@ -194,6 +194,27 @@ ssize_t send_cmd_hdd_rename(int fd, char * src, char * dst)
   strcpy((char *) &req.data[2], src);
   put_u16(&req.data[2 + srcLen], dstLen);
   strcpy((char *) &req.data[2 + srcLen + 2], dst);
+  return send_tf_packet(fd, &req);
+}
+
+ssize_t send_cmd_hdd_create_dir(int fd, char * path)
+{
+  struct tf_packet req;
+  __u16 packetSize;
+  __u16 pathLen = strlen(path) + 1;
+
+  if((PACKET_HEAD_SIZE + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
+    {
+      fprintf(stderr, "ERROR: Path is too long.\n");
+      return -1;
+    }
+
+  packetSize = PACKET_HEAD_SIZE + 2 + pathLen;
+  packetSize = (packetSize + 1) & ~1;
+  put_u16(&req.length, packetSize);
+  put_u32(&req.cmd, CMD_HDD_CREATE_DIR);
+  put_u16(&req.data[0], pathLen);
+  strcpy((char *) &req.data[2], path);
   return send_tf_packet(fd, &req);
 }
 

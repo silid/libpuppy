@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.13 2004/12/26 11:04:34 purbanec Exp $ */
+/* $Id: puppy.c,v 1.14 2005/01/04 14:15:04 purbanec Exp $ */
 
 /*
 
@@ -71,6 +71,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on);
 void decode_dir(struct tf_packet *p);
 void do_hdd_del(int fd, char * path);
 void do_hdd_rename(int fd, char * srcPath, char * dstPath);
+void do_hdd_mkdir(int fd, char * path);
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
 void finalStats(__u64 bytes, time_t startTime);
 
@@ -166,6 +167,10 @@ int main(int argc, char * argv[])
 
     case CMD_HDD_RENAME:
       do_hdd_rename(fd, arg1, arg2);
+      break;
+
+    case CMD_HDD_CREATE_DIR:
+      do_hdd_mkdir(fd, arg1);
       break;
 
     default:
@@ -632,6 +637,28 @@ void do_hdd_rename(int fd, char * srcPath, char * dstPath)
     }
 }
 
+void do_hdd_mkdir(int fd, char * path)
+{
+  int r;
+  r = send_cmd_hdd_create_dir(fd, path);
+  if(r < 0) return;
+
+  r = get_tf_packet(fd, & reply);
+  if(r < 0) return;
+  switch(get_u32(& reply.cmd))
+    {
+    case SUCCESS:
+      break;
+      
+    case FAIL:
+      fprintf(stderr, "Error: %s\n", decode_error(& reply));
+      break;
+      
+    default:
+      fprintf(stderr, "Unhandled packet\n");
+    }
+}
+
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
 {
   int delta = abs(difftime(startTime, time(NULL)));
@@ -673,7 +700,7 @@ void usage(char * myName)
     " -q             - quiet transfers - no progress updates\n"
     " -d <device>    - USB device (must be usbfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
-    " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
+    " -c <command>   - one of size, dir, get, put, rename, delete, mkdir, reboot, cancel\n"
     " args           - optional arguments, as required by each command\n";
   fprintf(stderr, usageString, myName);
 }
@@ -735,6 +762,8 @@ int parseArgs(int argc, char * argv[])
 	    cmd = CMD_HDD_DEL;
 	  else if(!strcasecmp(optarg, "rename"))
 	    cmd = CMD_HDD_RENAME;
+	  else if(!strcasecmp(optarg, "mkdir"))
+	    cmd = CMD_HDD_CREATE_DIR;
 	  break;
 
 	default:
@@ -809,6 +838,19 @@ int parseArgs(int argc, char * argv[])
       else
 	{
 	  fprintf(stderr, "ERROR: Specify both source and destination paths for rename.\n");
+	  return -1;
+	}
+    }
+
+  if(cmd == CMD_HDD_CREATE_DIR)
+    {
+      if(optind < argc)
+	{
+	  arg1 = argv[optind];
+	}
+      else
+	{
+	  fprintf(stderr, "ERROR: Specify name of directory to create.\n");
 	  return -1;
 	}
     }
