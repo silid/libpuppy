@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.12 2004/12/23 12:23:36 purbanec Exp $ */
+/* $Id: puppy.c,v 1.13 2004/12/26 11:04:34 purbanec Exp $ */
 
 /*
 
@@ -49,12 +49,15 @@
 extern time_t timezone;
 
 int verbose = 0;
+int quiet = 0;
 char * devPath = NULL;
 int turbo_req = 0;
 __u32 cmd = 0;
 char * arg1 = NULL;
 char * arg2 = NULL;
 __u8 sendDirection = GET;
+struct tf_packet packet;
+struct tf_packet reply;
 
 int parseArgs(int argc, char * argv[]);
 int isToppy(struct usb_device_descriptor * desc);
@@ -65,9 +68,11 @@ void do_hdd_size(int fd);
 void do_hdd_dir(int fd, char * path);
 void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on);
 void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on);
-void decode_dir(struct tf_packet *packet);
+void decode_dir(struct tf_packet *p);
 void do_hdd_del(int fd, char * path);
 void do_hdd_rename(int fd, char * srcPath, char * dstPath);
+void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
+void finalStats(__u64 bytes, time_t startTime);
 
 int main(int argc, char * argv[])
 {
@@ -172,7 +177,6 @@ int main(int argc, char * argv[])
 void switch_turbo(int fd, int turbo_on)
 {
   int r;
-  struct tf_packet reply;
 
   r = send_cmd_turbo(fd, turbo_on);
   if(r < 0) return;
@@ -196,7 +200,6 @@ void switch_turbo(int fd, int turbo_on)
 void do_cmd_reset(int fd)
 {
   int r;
-  struct tf_packet reply;
   r = send_cmd_reset(fd);
   if(r < 0) return;
 
@@ -220,7 +223,6 @@ void do_cmd_reset(int fd)
 void do_cancel(int fd)
 {
   int r;
-  struct tf_packet reply;
   r = send_cancel(fd);
   if(r < 0) return;
 
@@ -244,7 +246,6 @@ void do_cancel(int fd)
 void do_hdd_size(int fd)
 {
   int r;
-  struct tf_packet reply;
   r = send_cmd_hdd_size(fd);
   if(r < 0) return;
 
@@ -274,7 +275,6 @@ void do_hdd_dir(int fd, char * path)
 {
   char getAnotherPacket = 1;
   int r;
-  struct tf_packet reply;
 
   r = send_cmd_hdd_dir(fd, path);
   if(r < 0) return;
@@ -303,10 +303,10 @@ void do_hdd_dir(int fd, char * path)
     }
 }
 
-void decode_dir(struct tf_packet * packet)
+void decode_dir(struct tf_packet * p)
 {
-  __u16 count = (get_u16(&packet->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
-  struct typefile *entries = (struct typefile *) packet->data;
+  __u16 count = (get_u16(&p->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
+  struct typefile *entries = (struct typefile *) p->data;
   int i;
   time_t timestamp;
   for(i = 0; (i < count); i++)
@@ -337,6 +337,7 @@ void decode_dir(struct tf_packet * packet)
 
 void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 {
+  time_t startTime = time(NULL);
   enum
     {
       START,
@@ -347,8 +348,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
     } state;
   int src = -1;
   int r;
-  struct tf_packet packet;
-  struct tf_packet reply;
+  int update = 0;
   struct stat64 srcStat;
   __u64 byteCount = 0;
 
@@ -373,6 +373,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
   state = START;
   while((state != EXIT) && (0 < get_tf_packet(fd, & reply)))
     {
+      update = (update + 1) % 16;
       switch(get_u32(& reply.cmd))
 	{
 	case SUCCESS:
@@ -425,9 +426,10 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 		      }
 		  }
 
-		fprintf(stderr, "\r%3.2f%%",
-			100.0f * ((float) byteCount / (float) srcStat.st_size));
-
+		if(!update && !quiet)
+		  {
+		    progressStats(srcStat.st_size, byteCount, startTime);
+		  }
 	      }
 	      break;
 
@@ -466,10 +468,12 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
   close(src);
   fprintf(stderr, "\n");
   switch_turbo(fd, 0);
+  finalStats(byteCount, startTime);
 }
 
 void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 {
+  time_t startTime = time(NULL);
   enum
     {
       START,
@@ -479,7 +483,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
     } state;
   int dst = -1;
   int r;
-  struct tf_packet reply;
+  int update = 0;
   __u64 byteCount = 0;
   struct utimbuf mod_utime_buf = {0, 0};
 
@@ -498,6 +502,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
   state = START;
   while((state != EXIT) && (0 < (r = get_tf_packet(fd, & reply))))
     {
+      update = (update + 1) % 16;
       switch(get_u32(& reply.cmd))
 	{
 	case DATA_HDD_FILE_START:
@@ -525,8 +530,10 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 	      __u16 dataLen = get_u16(&reply.length) - (PACKET_HEAD_SIZE + 8);
 	      ssize_t w;
 
-	      fprintf(stderr, "\r%3.2f%%",
-		      100.0f * ((float) (offset + dataLen) / (float) byteCount));
+	      if(!update && !quiet)
+		{
+		  progressStats(byteCount, offset + dataLen, startTime);
+		}
 
 	      if(r < get_u16(&reply.length))
 		{
@@ -578,12 +585,12 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
   fprintf(stderr, "\n");
   utime(dstPath, &mod_utime_buf);
   switch_turbo(fd, 0);
+  finalStats(byteCount, startTime);
 }
 
 void do_hdd_del(int fd, char * path)
 {
   int r;
-  struct tf_packet reply;
   r = send_cmd_hdd_del(fd, path);
   if(r < 0) return;
 
@@ -606,7 +613,6 @@ void do_hdd_del(int fd, char * path)
 void do_hdd_rename(int fd, char * srcPath, char * dstPath)
 {
   int r;
-  struct tf_packet reply;
   r = send_cmd_hdd_rename(fd, srcPath, dstPath);
   if(r < 0) return;
 
@@ -626,6 +632,36 @@ void do_hdd_rename(int fd, char * srcPath, char * dstPath)
     }
 }
 
+void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
+{
+  int delta = abs(difftime(startTime, time(NULL)));
+
+  if(delta > 0)
+    {
+      double rate = bytes / delta;
+      int eta = (totalSize - bytes) / rate;
+
+      fprintf(stderr, "\r%6.2f%%, %5.2f Mbits/s, %02d:%02d:%02d elapsed, %02d:%02d:%02d remaining",
+	      100.0 * ((double) (bytes) / (double) totalSize),
+	      ((bytes * 8.0) / delta) / (1000 * 1000),
+	      delta / (60 * 60), (delta / 60) % 60, delta % 60,
+	      eta / (60 * 60), (eta / 60) % 60, eta % 60);
+    }
+}
+
+void finalStats(__u64 bytes, time_t startTime)
+{
+  int delta = abs(difftime(startTime, time(NULL)));
+  fprintf(stderr, "%.2f Mbytes in %02d:%02d:%02d",
+	  (double) bytes / (1000.0 * 1000.0),
+	  delta / (60 * 60), (delta / 60) % 60, delta % 60);
+  if(delta > 0)
+    {
+      fprintf(stderr, " (%.2f Mbits/s)", ((bytes * 8.0) / delta) / (1000.0 * 1000.0));
+    }
+  fprintf(stderr, "\n");
+}
+
 void usage(char * myName)
 {
   char * usageString =
@@ -634,6 +670,7 @@ void usage(char * myName)
     " -P             - full packet dump output to stderr\n"
     " -t             - turbo mode on for file xfers\n"
     " -v             - verbose output to stderr\n"
+    " -q             - quiet transfers - no progress updates\n"
     " -d <device>    - USB device (must be usbfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
     " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
@@ -647,7 +684,7 @@ int parseArgs(int argc, char * argv[])
   extern int optind;
   int c;
 
-  while((c = getopt(argc, argv, "pPtvd:c:")) != -1)
+  while((c = getopt(argc, argv, "pPqtvd:c:")) != -1)
     {
       switch(c)
 	{
@@ -661,6 +698,10 @@ int parseArgs(int argc, char * argv[])
 
 	case 'P':
 	  packet_trace = 2;
+	  break;
+
+	case 'q':
+	  quiet = 1;
 	  break;
 
 	case 't':
