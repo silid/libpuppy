@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.7 2004/12/16 13:54:27 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.8 2004/12/23 05:43:17 purbanec Exp $ */
 
 /*
 
@@ -36,7 +36,7 @@
 #include "usb_ch9.h"
 #endif
 
-
+#include "mjd.h"
 #include "tf_bytes.h"
 
 /* Topfield command codes */
@@ -97,10 +97,7 @@ struct tf_packet
 /* Topfield file descriptor data structure. */
 struct typefile
 {
-  __u16 mjd;
-  __u8 hour;
-  __u8 minute;
-  __u8 second;
+  struct tf_datetime stamp;
   __u8 filetype;
   __u64 size;
   __u8 name[95];
