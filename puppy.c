@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.18 2005/03/01 01:21:25 purbanec Exp $ */
+/* $Id: puppy.c,v 1.19 2005/03/01 13:23:23 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <asm/byteorder.h>
@@ -53,6 +54,7 @@
 
 extern time_t timezone;
 
+int lockFd = -1;
 int verbose = 0;
 int quiet = 0;
 char *devPath = NULL;
@@ -87,13 +89,29 @@ int main(int argc, char *argv[])
     int fd = -1;
     int r;
 
-    /* Initialise the timezone handling */
+    /* Initialise timezone handling. */
     tzset();
 
+    lockFd = open("/tmp/puppy", O_CREAT, S_IRUSR | S_IWUSR);
+    if(lockFd < 0)
+    {
+        fprintf(stderr, "ERROR: Can not open lock file /tmp/puppy: %s\n",
+                strerror(errno));
+        return 7;
+    }
+    
     r = parseArgs(argc, argv);
     if(r != 0)
     {
         return 1;
+    }
+
+    /* Create a lock, so that other instances of puppy can detect this one. */
+    if(0 != flock(lockFd, LOCK_SH | LOCK_NB))
+    {
+        fprintf(stderr, "ERROR: Can not obtain shared lock on /tmp/puppy: %s\n",
+                strerror(errno));
+        return 8;
     }
 
     trace(1, fprintf(stderr, "cmd %04x on %s\n", cmd, devPath));
@@ -101,8 +119,16 @@ int main(int argc, char *argv[])
     fd = open(devPath, O_RDWR);
     if(fd < 0)
     {
-        fprintf(stderr, "Can not open %s for read/write\n", devPath);
+        fprintf(stderr, "ERROR: Can not open %s for read/write: %s\n",
+                devPath, strerror(errno));
         return 1;
+    }
+    
+    if(0 != flock(fd, LOCK_EX | LOCK_NB))
+    {
+        fprintf(stderr, "ERROR: Can not get exclusive lock on %s\n", devPath);
+        close(fd);
+        return 6;
     }
 
     {
@@ -111,7 +137,7 @@ int main(int argc, char *argv[])
         r = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &interface);
         if(r < 0)
         {
-            fprintf(stderr, "Can not claim interface 0: %s\n",
+            fprintf(stderr, "ERROR: Can not claim interface 0: %s\n",
                     strerror(errno));
             close(fd);
             return 5;
@@ -127,7 +153,7 @@ int main(int argc, char *argv[])
 
     if(!isToppy(&devDesc))
     {
-        fprintf(stderr, "Could not find a Topfield TF5000PVRt\n");
+        fprintf(stderr, "ERROR: Could not find a Topfield TF5000PVRt\n");
         close(fd);
         return 3;
     }
@@ -183,7 +209,7 @@ int main(int argc, char *argv[])
             break;
 
         default:
-            fprintf(stderr, "Command 0x%08x not implemented\n", cmd);
+            fprintf(stderr, "BUG: Command 0x%08x not implemented\n", cmd);
     }
     return 0;
 }
@@ -213,11 +239,11 @@ void switch_turbo(int fd, int turbo_on)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -244,11 +270,11 @@ void do_cmd_reset(int fd)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -275,11 +301,11 @@ void do_cancel(int fd)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -314,11 +340,11 @@ void do_hdd_size(int fd)
         }
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -347,12 +373,12 @@ void do_hdd_dir(int fd, char *path)
                 break;
 
             case FAIL:
-                fprintf(stderr, "Error: %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
                 getAnotherPacket = 0;
                 break;
 
             default:
-                fprintf(stderr, "Unhandled packet\n");
+                fprintf(stderr, "ERROR: Unhandled packet\n");
         }
     }
 }
@@ -412,12 +438,20 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
     src = open64(srcPath, O_RDONLY);
     if(src < 0)
     {
-        fprintf(stderr, "Can not open source file: %s\n", strerror(errno));
+        fprintf(stderr, "ERROR: Can not open source file: %s\n", strerror(errno));
         return;
     }
 
     if(0 != fstat64(src, &srcStat))
     {
+        fprintf(stderr, "ERROR: Can not examine source file: %s\n", strerror(errno));
+        close(src);
+        return;
+    }
+    
+    if(srcStat.st_size == 0)
+    {
+        fprintf(stderr, "ERROR: Source file is empty - not transfering.\n");
         close(src);
         return;
     }
@@ -483,7 +517,7 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                             r = send_tf_packet(fd, &packet);
                             if(r < w)
                             {
-                                fprintf(stderr, "Incomplete send.\n");
+                                fprintf(stderr, "ERROR: Incomplete send.\n");
                                 return;
                             }
                         }
@@ -519,12 +553,12 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             case FAIL:
-                fprintf(stderr, "Error: %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
                 state = EXIT;
                 break;
 
             default:
-                fprintf(stderr, "Unhandled packet\n");
+                fprintf(stderr, "ERROR: Unhandled packet\n");
                 break;
         }
     }
@@ -554,7 +588,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
     if(dst < 0)
     {
-        fprintf(stderr, "Can not open destination file: %s\n",
+        fprintf(stderr, "ERROR: Can not open destination file: %s\n",
                 strerror(errno));
         return;
     }
@@ -587,7 +621,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 else
                 {
                     fprintf(stderr,
-                            "Unexpected DATA_HDD_FILE_START packet in state %d\n",
+                            "ERROR: Unexpected DATA_HDD_FILE_START packet in state %d\n",
                             state);
                     send_cancel(fd);
                     state = ABORT;
@@ -609,7 +643,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
 
                     if(r < get_u16(&reply.length))
                     {
-                        fprintf(stderr, "Short packet %d instead of %d\n", r,
+                        fprintf(stderr, "ERROR: Short packet %d instead of %d\n", r,
                                 get_u16(&reply.length));
                         /* TODO: Fetch the rest of the packet */
                     }
@@ -618,7 +652,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                     if(w < dataLen)
                     {
                         /* Can't write data - abort transfer */
-                        fprintf(stderr, "Error writing data: %s\n",
+                        fprintf(stderr, "ERROR: Can not write data: %s\n",
                                 strerror(errno));
                         send_cancel(fd);
                         state = ABORT;
@@ -627,7 +661,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 else
                 {
                     fprintf(stderr,
-                            "Unexpected DATA_HDD_FILE_DATA packet in state %d\n",
+                            "ERROR: Unexpected DATA_HDD_FILE_DATA packet in state %d\n",
                             state);
                     send_cancel(fd);
                     state = ABORT;
@@ -640,7 +674,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             case FAIL:
-                fprintf(stderr, "Error: %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
                 send_cancel(fd);
                 state = ABORT;
                 break;
@@ -650,7 +684,7 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             default:
-                fprintf(stderr, "Unhandled packet\n");
+                fprintf(stderr, "ERROR: Unhandled packet\n");
         }
     }
     close(dst);
@@ -681,11 +715,11 @@ void do_hdd_del(int fd, char *path)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -710,11 +744,11 @@ void do_hdd_rename(int fd, char *srcPath, char *dstPath)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -739,11 +773,11 @@ void do_hdd_mkdir(int fd, char *path)
             break;
 
         case FAIL:
-            fprintf(stderr, "Error: %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
             break;
 
         default:
-            fprintf(stderr, "Unhandled packet\n");
+            fprintf(stderr, "ERROR: Unhandled packet\n");
     }
 }
 
@@ -966,6 +1000,13 @@ char *findToppy(void)
     int found = 0;
     static char pathBuffer[32];
 
+    /* Refuse to scan while another instance is running. */
+    if(0 != flock(lockFd, LOCK_EX | LOCK_NB))
+    {
+        fprintf(stderr, "ERROR: Can not scan for devices while another instance of puppy is running.\n");
+        return NULL;
+    }
+    
     /* Open the /proc/bus/usb/devices file, and read it to find candidate Topfield devices. */
     if((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL)
     {
