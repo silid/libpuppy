@@ -1,5 +1,5 @@
 # Copyright (C) 2004 Peter Urbanec
-# $Id: Makefile,v 1.3 2004/12/15 02:46:06 purbanec Exp $
+# $Id: Makefile,v 1.4 2004/12/23 05:45:34 purbanec Exp $
 
 ifdef CROSS
 
@@ -26,19 +26,15 @@ endif
 
 CFLAGS=-std=gnu99 -Wall -W -Wshadow -Wstrict-prototypes -pedantic -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2
 
-
-puppy: puppy.o crc16.o usb_io.o tf_bytes.o
-
-puppy.o: puppy.c crc16.h usb_io.h tf_bytes.h
-
-tf_bytes.o: tf_bytes.h tf_bytes.c
-
-crc16.o: crc16.h crc16.c
-
-usb_io.o: usb_io.h usb_io.h crc16.h tf_bytes.h
+puppy: puppy.o crc16.o mjd.o tf_bytes.o usb_io.o
 
 clean:
 	-rm -f *.o
 	-rm -f *~
 	-rm -f puppy
 
+crc16.o: crc16.c crc16.h
+mjd.o: mjd.c mjd.h tf_bytes.h
+puppy.o: puppy.c usb_io.h mjd.h tf_bytes.h
+tf_bytes.o: tf_bytes.c tf_bytes.h
+usb_io.o: usb_io.c usb_io.h mjd.h tf_bytes.h crc16.h
