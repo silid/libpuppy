@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.4 2004/12/11 23:09:27 rwhitby Exp $ */
+/* $Id: puppy.c,v 1.5 2004/12/12 07:32:27 purbanec Exp $ */
 
 /*
 
@@ -283,7 +283,7 @@ void decode_dir(struct tf_packet * packet)
 	default:
 	  type = '?';
 	}
-      printf("%c %20llu %s\n", type, entries[i].size, entries[i].name);
+      printf("%c %20llu %s\n", type, get_u64(&entries[i].size), entries[i].name);
     }
 }
 
@@ -332,8 +332,8 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	      {
 		// Send start
 		struct typefile * tf = (struct typefile *) packet.data;
-		packet.length = PACKET_HEAD_SIZE + 114;
-		packet.cmd = DATA_HDD_FILE_START;
+		put_u16(&packet.length, PACKET_HEAD_SIZE + 114);
+		put_u32(&packet.cmd, DATA_HDD_FILE_START);
 		tf->mjd = 0;
 		tf->hour = 0;
 		tf->minute = 0;
@@ -357,8 +357,8 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	      {
 		int payloadSize = sizeof(packet.data) - 9;
 		ssize_t w = read(src, &packet.data[8], payloadSize);
-		packet.length = PACKET_HEAD_SIZE + 8 + w;
-		packet.cmd = DATA_HDD_FILE_DATA;
+	        put_u16(&packet.length, PACKET_HEAD_SIZE + 8 + w);
+		put_u32(&packet.cmd, DATA_HDD_FILE_DATA);
 		put_u64(packet.data, byteCount);
 		byteCount += w;
 
@@ -382,8 +382,8 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 
 	    case END:
 	      // Send end
-	      packet.length = PACKET_HEAD_SIZE;
-	      packet.cmd = DATA_HDD_FILE_END;
+	      put_u16(&packet.length, PACKET_HEAD_SIZE);
+	      put_u32(&packet.cmd, DATA_HDD_FILE_END);
 	      r = send_tf_packet(fd, &packet);
 	      if(r < 0)
 		{
