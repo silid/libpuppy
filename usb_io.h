@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.2 2004/12/09 14:56:43 purbanec Exp $ */
 
 /*
 
@@ -26,6 +26,17 @@
 #define _USB_IO_H 1
 
 #include <sys/types.h>
+#include <linux/types.h>
+
+/* This is a workaround for an issue when building unslung
+   packages and cross compiling with crosstool.
+
+   OE builds don't seem to suffer.
+*/
+#ifndef __KERNEL__
+typedef unsigned long kernel_ulong_t;
+#endif
+
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 
