@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.h,v 1.10 2005/01/18 14:00:47 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.11 2005/02/17 22:51:40 purbanec Exp $ */
 
 /*
 
@@ -68,7 +68,7 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 /* Number of milliseconds to wait for a packet transfer to complete. */
-#define TF_PROTOCOL_TIMEOUT 1000
+#define TF_PROTOCOL_TIMEOUT 11000
 
 /* 0 - disable tracing
    1 - show packet headers
