@@ -1,10 +1,10 @@
 # Copyright (C) 2004 Peter Urbanec
-# $Id: Makefile,v 1.5 2004/12/26 11:02:02 purbanec Exp $
+# $Id: Makefile,v 1.6 2005/02/25 13:34:57 purbanec Exp $
 
 ifdef CROSS
 
 ARCH=armv5b-softfloat-linux
-CROSS_HOME=/home/slug/sourceforge/unslung/toolchain/${ARCH}/gcc-3.3.4-glibc-2.2.5
+CROSS_HOME=/home/slug/sourceforge/unslung/toolchain/${ARCH}/gcc-3.3.5-glibc-2.2.5
 CROSS_PATH=${CROSS_HOME}/bin
 
 AR=${CROSS_PATH}/${ARCH}-ar
