@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.11 2005/01/04 14:15:04 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.12 2005/01/17 14:03:53 purbanec Exp $ */
 
 /*
 
@@ -73,12 +73,15 @@ ssize_t send_cancel(int fd)
   return send_tf_packet(fd, &req);
 }
 
+/* Optimised packet handling to reduce overhead during bulk file transfers. */
 ssize_t send_success(int fd)
 {
-  struct tf_packet req;
-  put_u16(&req.length, 8);
-  put_u32(&req.cmd, SUCCESS);
-  return send_tf_packet(fd, &req);
+    static __u8 success_packet[8] =
+        {
+           0x08, 0x00, 0x81, 0xc1, 0x00, 0x00, 0x02, 0x00
+        };
+        
+  return usb_bulk_write(fd, 0x01, success_packet, 8, TF_PROTOCOL_TIMEOUT);
 }
 
 ssize_t send_cmd_reset(int fd)
@@ -291,10 +294,18 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
   r = usb_bulk_read(fd, 0x82, buf, MAXIMUM_PACKET_SIZE, TF_PROTOCOL_TIMEOUT);
   if(r < PACKET_HEAD_SIZE)
     {
+      fprintf(stderr, "Short read. %d bytes\n", r);
       return -1;
+    }
+    
+    /* Send SUCCESS as soon as we see a data transfer packet */
+    if(DATA_HDD_FILE_DATA == get_u32_raw(&packet->cmd))
+    {
+        send_success(fd);
     }
 
   byte_swap(packet);
+  return r;
 
   {
     __u16 crc;
@@ -316,7 +327,7 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 	fprintf(stderr, "WARNING: Packet CRC %04x, expected %04x\n", crc, calc_crc);
       }
   }
-
+  
   print_packet(packet, " IN<");
   return r;
 }

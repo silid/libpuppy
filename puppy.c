@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.15 2005/01/14 13:47:23 purbanec Exp $ */
+/* $Id: puppy.c,v 1.16 2005/01/17 14:03:47 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp
@@ -628,10 +628,6 @@ do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                                 strerror(errno));
                         send_cancel(fd);
                         state = ABORT;
-                    }
-                    else
-                    {
-                        send_success(fd);
                     }
                 }
                 else

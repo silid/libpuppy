@@ -1,4 +1,4 @@
-/* $Id: tf_bytes.c,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+/* $Id: tf_bytes.c,v 1.2 2005/01/17 14:03:53 purbanec Exp $ */
 
 /*
 
@@ -60,6 +60,17 @@ __u32 get_u32(void * addr)
     (b[1] << 16) |
     (b[2] <<  8) |
     (b[3]);
+}
+
+/* Retrieve a 32-bit integer from the raw buffer (prior to byteswapping) */
+__u32 get_u32_raw(void * addr)
+{
+  __u8 *b = addr;
+  return
+    (b[1] << 24) |
+    (b[0] << 16) |
+    (b[3] <<  8) |
+    (b[2]);
 }
 
 void put_u32(void * addr, __u32 val)
