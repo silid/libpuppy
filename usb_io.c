@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.2 2004/12/10 16:43:02 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.3 2004/12/12 11:15:09 purbanec Exp $ */
 
 /*
 
@@ -190,8 +190,18 @@ int get_tf_packet(int fd, struct tf_packet * packet)
   byte_swap(packet);
 
   {
-    __u16 crc = get_u16(&packet->crc);
-    __u16 calc_crc = get_crc(packet);
+    __u16 crc;
+    __u16 calc_crc;
+    __u16 len = get_u16(&packet->length);
+
+  if(len < PACKET_HEAD_SIZE)
+    {
+      fprintf(stderr, "Invalid packet length %04x\n", len);
+      return -1;
+    }
+
+    crc = get_u16(&packet->crc);
+    calc_crc = get_crc(packet);
 
     // Complain about CRC mismatch
     if(crc != calc_crc)
