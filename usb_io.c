@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.3 2004/12/12 11:15:09 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.4 2004/12/13 12:48:25 purbanec Exp $ */
 
 /*
 
@@ -46,6 +46,9 @@
  * transmission.
  */
 
+// 0 - disable tracing
+// 1 - show packet headers
+// 2+ - dump entire packet
 int packet_trace = 0;
 
 void byte_swap(struct tf_packet * packet)
@@ -127,33 +130,48 @@ int send_cmd_hdd_file_send(int fd, __u8 dir, char * path)
 
 void print_packet(struct tf_packet * packet, char * prefix)
 {
-  if(!packet_trace) return;
+  int i;
+  __u8 *d = (__u8 *)packet;
+  __u16 pl = get_u16(&packet->length);
 
-  {
-    int i;
-    __u8 *d = (__u8 *)packet;
-    __u16 pl = get_u16(&packet->length);
-    fprintf(stderr, "%s", prefix);
-    for(i = 0; i < pl; ++i)
-      {
-	fprintf(stderr, " %02x", d[i]);
-	if(31 == (i % 32))
-	  fprintf(stderr, "\n%s", prefix);
-      }
-    fprintf(stderr, "\n");
+  switch(packet_trace)
+    {
+    case 0:
+      // Do nothing
+      break;
 
-    fprintf(stderr, "%s", prefix);
-    for(i = 0; i < pl; ++i)
-      {
-	if(isalnum(d[i]) || ispunct(d[i]))
-	  fprintf(stderr, "%c", d[i]);
-	else
-	  fprintf(stderr, ".");
-	if(79 == (i % 80))
-	  fprintf(stderr, "\n%s", prefix);
-      }
-    fprintf(stderr, "\n");
-  }
+    case 1:
+      fprintf(stderr, "%s", prefix);
+      for(i = 0; i < 8; ++i)
+	{
+	  fprintf(stderr, " %02x", d[i]);
+	}
+      fprintf(stderr, "\n");
+      break;
+
+    default:
+      fprintf(stderr, "%s", prefix);
+      for(i = 0; i < pl; ++i)
+	{
+	  fprintf(stderr, " %02x", d[i]);
+	  if(31 == (i % 32))
+	    fprintf(stderr, "\n%s", prefix);
+	}
+      fprintf(stderr, "\n");
+
+      fprintf(stderr, "%s", prefix);
+      for(i = 0; i < pl; ++i)
+	{
+	  if(isalnum(d[i]) || ispunct(d[i]))
+	    fprintf(stderr, "%c", d[i]);
+	  else
+	    fprintf(stderr, ".");
+	  if(79 == (i % 80))
+	    fprintf(stderr, "\n%s", prefix);
+	}
+      fprintf(stderr, "\n");
+      break;
+    }
 }
 
 /* Given a Topfield protocol packet, this function will calculate the required
