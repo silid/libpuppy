@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.3 2004/12/10 16:43:02 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.4 2004/12/13 12:47:29 purbanec Exp $ */
 
 /*
 
@@ -69,6 +69,9 @@
 /* Number of milliseconds to wait for a packet transfer to complete. */
 #define TF_PROTOCOL_TIMEOUT 1000
 
+// 0 - disable tracing
+// 1 - show packet headers
+// 2+ - dump entire packet
 extern int packet_trace;
 
 /* The maximum packet size used by the Toppy. This happens to be an
