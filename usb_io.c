@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.9 2004/12/18 00:46:39 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.10 2004/12/23 12:06:06 purbanec Exp $ */
 
 /*
 
@@ -250,7 +250,6 @@ ssize_t send_tf_packet(int fd, struct tf_packet * packet)
   __u16 pl = get_u16(&packet->length);
   if(pl % 2)
     {
-      fprintf(stderr, "WARNING: packet size is odd (not even)\n");
       /* Have to send an extra byte to preserve the byteswapped odd byte */
       pl++;
     }
