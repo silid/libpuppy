@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.8 2004/12/15 02:49:23 purbanec Exp $ */
+/* $Id: puppy.c,v 1.9 2004/12/15 14:34:36 purbanec Exp $ */
 
 /*
 
@@ -707,10 +707,6 @@ int parseArgs(int argc, char * argv[])
 
   if(cmd == CMD_HDD_RENAME)
     {
-      /* TODO: Re-enable once it is working */
-      fprintf(stderr, "ERROR: Rename is currently disabled. Attempting a rename will destroy the source file.\n");
-      return -1;
-
       if((optind + 1) < argc)
 	{
 	  arg1 = argv[optind];
