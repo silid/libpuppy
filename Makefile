@@ -1,36 +1,31 @@
 # Copyright (C) 2004 Peter Urbanec
-# $Id: Makefile,v 1.1 2004/12/08 12:55:11 purbanec Exp $
+# $Id: Makefile,v 1.2 2004/12/09 14:54:23 purbanec Exp $
 
 ifdef CROSS
 
-#
-# TODO: This is just a temporary hack to crosscompile on my machine.
-#       What's needed is a proper cross-build script for unslung / OE
-#
-MY_CROSS_HOME=/home/slug/bk/build/tmp/staging/armeb-linux
+ARCH=armv5b-softfloat-linux
+CROSS_HOME=/opt/crosstool/${ARCH}/gcc-3.3.4-glibc-2.2.5
+CROSS_PATH=${CROSS_HOME}/bin
 
-ARCH="arm"
+AR=${CROSS_PATH}/${ARCH}-ar
+CPP=${CROSS_PATH}/${ARCH}-gcc -E
+CC=${CROSS_PATH}/${ARCH}-gcc
+CXX=${CROSS_PATH}/${ARCH}-g++
+LD=${CROSS_PATH}/${ARCH}-ld
+CCLD=${CROSS_PATH}/${ARCH}-gcc
+STRIP=${CROSS_PATH}/${ARCH}-strip
+RANLIB=${CROSS_PATH}/${ARCH}-ranlib
 
-CROSS_COMPILE="armeb-linux-"
-AR="armeb-linux-ar"
-CPP="armeb-linux-gcc -E"
-CC="armeb-linux-gcc"
-CXX="armeb-linux-g++"
-LD="armeb-linux-ld"
-CCLD="armeb-linux-gcc"
-STRIP="armeb-linux-strip"
-RANLIB="armeb-linux-ranlib"
-
-CPPFLAGS="-I${MY_CROSS_HOME}/include"
-CFLAGS="-Wall -I${MY_CROSS_HOME}/include -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2"
-CXXFLAGS="-Wall -I${MY_CROSS_HOME}/include -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2 -fpermissive"
-LDFLAGS=-L${MY_CROSS_HOME}/lib -Wl,-rpath-link,${MY_CROSS_HOME}/lib -Wl,-rpath,/usr/lib -Wl,-O2
+LDFLAGS=-L${CROSS_HOME}/lib -Wl,-rpath-link,${CROSS_HOME}/lib -Wl,-rpath,/usr/lib -Wl,-O2
 
 else
-CFLAGS="-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2"
-CXXFLAGS="-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2 -fpermissive"
+
 LDFLAGS=-Wl,-O2
+
 endif
+
+CFLAGS=-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2
+CXXFLAGS=-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2 -fpermissive
 
 
 puppy: puppy.o crc16.o usb_io.o tf_bytes.o
