@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.3 2004/12/11 23:02:08 rwhitby Exp $ */
+/* $Id: puppy.c,v 1.4 2004/12/11 23:09:27 rwhitby Exp $ */
 
 /*
 
@@ -654,6 +654,7 @@ char *findToppy(void)
       /* If we've already found one, then there are multiple devices present. */
       if (found) {
 	trace(1, printf("Multiple Topfield devices recognised, aborting search\n"));
+	fclose(toppy);
 	return NULL;
       }
 
@@ -663,5 +664,6 @@ char *findToppy(void)
     }
   }
 
+  fclose(toppy);
   return devPath;
 }
