@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.4 2004/12/13 12:48:25 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.5 2004/12/14 16:24:26 purbanec Exp $ */
 
 /*
 
@@ -105,26 +105,86 @@ __u16 get_crc(struct tf_packet * packet)
 int send_cmd_hdd_dir(int fd, char * path)
 {
   struct tf_packet req;
-  __u16 packetSize = MIN(MAXIMUM_PACKET_SIZE, PACKET_HEAD_SIZE + strlen(path) + 1);
+  __u16 packetSize;
+  int pathLen = strlen(path) + 1;
+
+  if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
+    {
+      fprintf(stderr, "ERROR: Path is too long.\n");
+      return -1;
+    }
+
+  packetSize = PACKET_HEAD_SIZE + pathLen;
   packetSize = (packetSize + 1) & ~1;
   put_u16(&req.length, packetSize);
   put_u32(&req.cmd, CMD_HDD_DIR);
-  strncpy(req.data, path, sizeof(req.data) - 1);
-  req.data[sizeof(req.data) - 1] = '\0';
+  strcpy(req.data, path);
   return send_tf_packet(fd, &req);
 }
 
 int send_cmd_hdd_file_send(int fd, __u8 dir, char * path)
 {
   struct tf_packet req;
-  __u16 packetSize = MIN(MAXIMUM_PACKET_SIZE, PACKET_HEAD_SIZE + strlen(path) + 1 + 3);
+  __u16 packetSize;
+  int pathLen = strlen(path) + 1;
+
+  if((PACKET_HEAD_SIZE + 1 + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
+    {
+      fprintf(stderr, "ERROR: Path is too long.\n");
+      return -1;
+    }
+
+  packetSize = PACKET_HEAD_SIZE + 1 + 2 + pathLen;
   packetSize = (packetSize + 1) & ~1;
   put_u16(&req.length, packetSize);
   put_u32(&req.cmd, CMD_HDD_FILE_SEND);
   req.data[0] = dir;
-  put_u16(&req.data[1], MIN(strlen(path) + 1, sizeof(req.data) - 3));
-  strncpy(&req.data[3], path, sizeof(req.data) - 4);
-  req.data[sizeof(req.data) - 1] = '\0';
+  put_u16(&req.data[1], pathLen);
+  strcpy(&req.data[3], path);
+  return send_tf_packet(fd, &req);
+}
+
+int send_cmd_hdd_del(int fd, char * path)
+{
+  struct tf_packet req;
+  __u16 packetSize;
+  int pathLen = strlen(path) + 1;
+
+  if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
+    {
+      fprintf(stderr, "ERROR: Path is too long.\n");
+      return -1;
+    }
+
+  packetSize = PACKET_HEAD_SIZE + pathLen;
+  packetSize = (packetSize + 1) & ~1;
+  put_u16(&req.length, packetSize);
+  put_u32(&req.cmd, CMD_HDD_DEL);
+  strcpy(req.data, path);
+  return send_tf_packet(fd, &req);
+}
+
+int send_cmd_hdd_rename(int fd, char * src, char * dst)
+{
+  struct tf_packet req;
+  __u16 packetSize;
+  __u16 srcLen = strlen(src) + 1;
+  __u16 dstLen = strlen(dst) + 1;
+
+  if((PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen) >= MAXIMUM_PACKET_SIZE)
+    {
+      fprintf(stderr, "ERROR: Combination of source and destination paths is too long.\n");
+      return -1;
+    }
+
+  packetSize = PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen;
+  packetSize = (packetSize + 1) & ~1;
+  put_u16(&req.length, packetSize);
+  put_u32(&req.cmd, CMD_HDD_FILE_SEND);
+  put_u16(&req.data[0], srcLen);
+  strcpy(&req.data[2], src);
+  put_u16(&req.data[2 + srcLen], dstLen);
+  strcpy(&req.data[2 + srcLen + 2], dst);
   return send_tf_packet(fd, &req);
 }
 
