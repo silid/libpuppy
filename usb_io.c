@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.6 2004/12/15 02:49:23 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.7 2004/12/15 07:27:16 purbanec Exp $ */
 
 /*
 
@@ -180,7 +180,7 @@ ssize_t send_cmd_hdd_rename(int fd, char * src, char * dst)
   packetSize = PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen;
   packetSize = (packetSize + 1) & ~1;
   put_u16(&req.length, packetSize);
-  put_u32(&req.cmd, CMD_HDD_FILE_SEND);
+  put_u32(&req.cmd, CMD_HDD_RENAME);
   put_u16(&req.data[0], srcLen);
   strcpy((char *) &req.data[2], src);
   put_u16(&req.data[2 + srcLen], dstLen);
