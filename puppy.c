@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.2 2004/12/09 14:56:01 purbanec Exp $ */
+/* $Id: puppy.c,v 1.3 2004/12/11 23:02:08 rwhitby Exp $ */
 
 /*
 
@@ -42,6 +42,8 @@
 #define PUT 0
 #define GET 1
 
+#define MAX_DEVICES_LINE_SIZE 128
+
 int verbose = 0;
 char * devPath = NULL;
 __u32 cmd = 0;
@@ -55,6 +57,7 @@ int fd = -1;
 
 int parseArgs(int argc, char * argv[]);
 int isToppy(struct usb_device_descriptor * desc);
+char *findToppy(void);
 void do_cancel(int fd);
 void do_cmd_reset(int fd);
 void do_hdd_size(int fd);
@@ -522,7 +525,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
 
 void usage(char * myName)
 {
-  char * usage = "Usage: %s [-v] -d <device> -c <command> [args]\n"
+  char * usage = "Usage: %s [-v] [-d <device>] -c <command> [args]\n"
     " -v             - verbose output to stderr\n"
     " -d <device>    - USB device (must be usbdevfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
@@ -577,6 +580,12 @@ int parseArgs(int argc, char * argv[])
 	}
     }
 
+  /* Search for a Toppy if the device is not specified */
+  if(devPath == NULL)
+    {
+      devPath = findToppy();
+    }
+
   if((cmd == 0) || (devPath == NULL))
     {
       usage(argv[0]);
@@ -614,4 +623,45 @@ int parseArgs(int argc, char * argv[])
 int isToppy(struct usb_device_descriptor * desc)
 {
   return (devDesc.idVendor == 0x11db) && (devDesc.idProduct == 0x1000);
+}
+
+char *findToppy(void)
+{
+  FILE *toppy;
+  char buffer[MAX_DEVICES_LINE_SIZE];
+  int bus, device, vendor, prodid;
+  int found = 0;
+  static char devPath[22];
+
+  /* Open the /proc/bus/usb/devices file, and read it to find candidate Topfield devices. */
+  if ((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL) {
+    return NULL;
+  }
+
+  /* Scan the devices file, line by line, looking for Topfield devices. */
+  while (fgets(buffer, MAX_DEVICES_LINE_SIZE, toppy)) {
+
+    /* Store the information from topology lines. */
+    if (sscanf(buffer, "T: Bus=%d Lev=%*d Prnt=%*d Port=%*d Cnt=%*d Dev#=%d", &bus, &device)) {
+      trace(1, printf("Found USB device at bus=%d, device=%d\n", bus, device));
+    }
+
+    /* Look for Topfield vendor/product lines, and also check for multiple devices. */
+    else if (sscanf(buffer, "P: Vendor=%x ProdID=%x", &vendor, &prodid) &&
+	     (vendor == 0x11db) && (prodid == 0x1000)) {
+      trace(1, printf("Recognised Topfield device at bus=%d, device=%d\n", bus, device));
+
+      /* If we've already found one, then there are multiple devices present. */
+      if (found) {
+	trace(1, printf("Multiple Topfield devices recognised, aborting search\n"));
+	return NULL;
+      }
+
+      /* Construct the devPath according to the topology found. */
+      sprintf(devPath, "/proc/bus/usb/%03d/%03d", bus, device);
+      found = 1;
+    }
+  }
+
+  return devPath;
 }
