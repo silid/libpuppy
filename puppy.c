@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.6 2004/12/13 12:52:11 purbanec Exp $ */
+/* $Id: puppy.c,v 1.7 2004/12/14 16:26:41 purbanec Exp $ */
 
 /*
 
@@ -65,6 +65,8 @@ void do_hdd_dir(int fd, char * path);
 void do_hdd_file_put(int fd, char * srcPath, char * dstPath);
 void do_hdd_file_get(int fd, char * srcPath, char * dstPath);
 void decode_dir(struct tf_packet *packet);
+void do_hdd_del(int fd, char * path);
+void do_hdd_rename(int fd, char * srcPath, char * dstPath);
 
 int main(int argc, char * argv[])
 {
@@ -144,6 +146,14 @@ int main(int argc, char * argv[])
 	{
 	  do_hdd_file_get(fd, arg1, arg2);
 	}
+      break;
+
+    case CMD_HDD_DEL:
+      do_hdd_del(fd, arg1);
+      break;
+
+    case CMD_HDD_RENAME:
+      do_hdd_rename(fd, arg1, arg2);
       break;
 
     default:
@@ -267,7 +277,8 @@ void decode_dir(struct tf_packet * packet)
   __u16 count = (get_u16(&packet->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
   struct typefile *entries = (struct typefile *) packet->data;
   int i;
-  for(i = 0; ((i < count) && entries[i].name[0] != '\0'); i++)
+  //  for(i = 0; ((i < count) && entries[i].name[0] != '\0'); i++)
+  for(i = 0; (i < count); i++)
     {
       char type;
       switch(entries[i].filetype)
@@ -523,6 +534,52 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
   printf("\n");
 }
 
+void do_hdd_del(int fd, char * path)
+{
+  int r;
+  struct tf_packet reply;
+  r = send_cmd_hdd_del(fd, path);
+  if(r < 0) return;
+
+  r = get_tf_packet(fd, & reply);
+  if(r < 0) return;
+  switch(get_u32(& reply.cmd))
+    {
+    case SUCCESS:
+      break;
+      
+    case FAIL:
+      fprintf(stderr, "Error: %s\n", decode_error(& reply));
+      break;
+      
+    default:
+      fprintf(stderr, "Unhandled packet\n");
+    }
+}
+
+void do_hdd_rename(int fd, char * srcPath, char * dstPath)
+{
+  int r;
+  struct tf_packet reply;
+  r = send_cmd_hdd_rename(fd, srcPath, dstPath);
+  if(r < 0) return;
+
+  r = get_tf_packet(fd, & reply);
+  if(r < 0) return;
+  switch(get_u32(& reply.cmd))
+    {
+    case SUCCESS:
+      break;
+      
+    case FAIL:
+      fprintf(stderr, "Error: %s\n", decode_error(& reply));
+      break;
+      
+    default:
+      fprintf(stderr, "Unhandled packet\n");
+    }
+}
+
 void usage(char * myName)
 {
   char * usage = "Usage: %s [-vpP] [-d <device>] -c <command> [args]\n"
@@ -531,7 +588,7 @@ void usage(char * myName)
     " -P             - full packet dump output to stderr\n"
     " -d <device>    - USB device (must be usbdevfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
-    " -c <command>   - one of size, dir, get, put, reboot, cancel\n"
+    " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
     " args           - optional arguments, as required by each command\n";
   fprintf(stderr, usage, myName);
 }
@@ -581,6 +638,10 @@ int parseArgs(int argc, char * argv[])
 	      cmd = CMD_HDD_FILE_SEND;
 	      sendDirection = GET;
 	    }
+	  else if(!strcasecmp(optarg, "delete"))
+	    cmd = CMD_HDD_DEL;
+	  else if(!strcasecmp(optarg, "rename"))
+	    cmd = CMD_HDD_RENAME;
 	  break;
 
 	default:
@@ -631,6 +692,38 @@ int parseArgs(int argc, char * argv[])
 	  return -1;
 	}
     }
+
+  if(cmd == CMD_HDD_DEL)
+    {
+      if(optind < argc)
+	{
+	  arg1 = argv[optind];
+	}
+      else
+	{
+	  fprintf(stderr, "ERROR: Specify name of file or directory to delete.\n");
+	  return -1;
+	}
+    }
+
+  if(cmd == CMD_HDD_RENAME)
+    {
+      // TODO: Re-enable once it is working
+      fprintf(stderr, "ERROR: Rename is currently disabled. Attempting a rename will destroy the source file.\n");
+      return -1;
+
+      if((optind + 1) < argc)
+	{
+	  arg1 = argv[optind];
+	  arg2 = argv[optind + 1];
+	}
+      else
+	{
+	  fprintf(stderr, "ERROR: Specify both source and destination paths for rename.\n");
+	  return -1;
+	}
+    }
+
   return 0;
 }
 
