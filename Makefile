@@ -1,5 +1,5 @@
 # Copyright (C) 2004 Peter Urbanec
-# $Id: Makefile,v 1.2 2004/12/09 14:54:23 purbanec Exp $
+# $Id: Makefile,v 1.3 2004/12/15 02:46:06 purbanec Exp $
 
 ifdef CROSS
 
@@ -24,8 +24,7 @@ LDFLAGS=-Wl,-O2
 
 endif
 
-CFLAGS=-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2
-CXXFLAGS=-Wall -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2 -fpermissive
+CFLAGS=-std=gnu99 -Wall -W -Wshadow -Wstrict-prototypes -pedantic -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2
 
 
 puppy: puppy.o crc16.o usb_io.o tf_bytes.o
