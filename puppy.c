@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.9 2004/12/15 14:34:36 purbanec Exp $ */
+/* $Id: puppy.c,v 1.10 2004/12/16 13:54:27 purbanec Exp $ */
 
 /*
 
@@ -46,6 +46,7 @@
 
 int verbose = 0;
 char * devPath = NULL;
+int turbo_req = 0;
 __u32 cmd = 0;
 char * arg1 = NULL;
 char * arg2 = NULL;
@@ -58,8 +59,8 @@ void do_cancel(int fd);
 void do_cmd_reset(int fd);
 void do_hdd_size(int fd);
 void do_hdd_dir(int fd, char * path);
-void do_hdd_file_put(int fd, char * srcPath, char * dstPath);
-void do_hdd_file_get(int fd, char * srcPath, char * dstPath);
+void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on);
+void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on);
 void decode_dir(struct tf_packet *packet);
 void do_hdd_del(int fd, char * path);
 void do_hdd_rename(int fd, char * srcPath, char * dstPath);
@@ -139,11 +140,11 @@ int main(int argc, char * argv[])
     case CMD_HDD_FILE_SEND:
       if(sendDirection == PUT)
 	{
-	  do_hdd_file_put(fd, arg1, arg2);
+	  do_hdd_file_put(fd, arg1, arg2, turbo_req);
 	}
       else
 	{
-	  do_hdd_file_get(fd, arg1, arg2);
+	  do_hdd_file_get(fd, arg1, arg2, turbo_req);
 	}
       break;
 
@@ -161,6 +162,30 @@ int main(int argc, char * argv[])
   return 0;
 }
 
+void switch_turbo(int fd, int turbo_on)
+{
+  int r;
+  struct tf_packet reply;
+
+  r = send_cmd_turbo(fd, turbo_on);
+  if(r < 0) return;
+
+  r = get_tf_packet(fd, & reply);
+  if(r < 0) return;
+  switch(get_u32(& reply.cmd))
+    {
+    case SUCCESS:
+      printf("Turbo mode: %s\n", turbo_on ? "On" : "Off");
+      break;
+      
+    case FAIL:
+      fprintf(stderr, "Error: %s\n", decode_error(& reply));
+      break;
+      
+    default:
+      fprintf(stderr, "Unhandled packet\n");
+    }
+}
 void do_cmd_reset(int fd)
 {
   int r;
@@ -296,7 +321,7 @@ void decode_dir(struct tf_packet * packet)
     }
 }
 
-void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
+void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 {
   enum
     {
@@ -325,6 +350,8 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
       close(src);
       return;
     }
+
+  switch_turbo(fd, turbo_on);
 
   r = send_cmd_hdd_file_send(fd, PUT, dstPath);
   if(r < 0) return;
@@ -422,9 +449,10 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	}
     }
   close(src);
+  switch_turbo(fd, 0);
 }
 
-void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
+void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 {
   enum
     {
@@ -445,6 +473,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
       return;
     }
 
+  switch_turbo(fd, turbo_on);
   r = send_cmd_hdd_file_send(fd, GET, srcPath);
   if(r < 0) return;
 
@@ -530,6 +559,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
     }
   close(dst);
   printf("\n");
+  switch_turbo(fd, 0);
 }
 
 void do_hdd_del(int fd, char * path)
@@ -585,6 +615,7 @@ void usage(char * myName)
     " -v             - verbose output to stderr\n"
     " -p             - packet header output to stderr\n"
     " -P             - full packet dump output to stderr\n"
+    " -t             - turbo mode on for file xfers\n"
     " -d <device>    - USB device (must be usbdevfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
     " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
@@ -598,7 +629,7 @@ int parseArgs(int argc, char * argv[])
   extern int optind;
   int c;
 
-  while((c = getopt(argc, argv, "pPvd:c:")) != -1)
+  while((c = getopt(argc, argv, "pPtvd:c:")) != -1)
     {
       switch(c)
 	{
@@ -612,6 +643,10 @@ int parseArgs(int argc, char * argv[])
 
 	case 'P':
 	  packet_trace = 2;
+	  break;
+
+	case 't':
+	  turbo_req = 1;
 	  break;
 
 	case 'd':

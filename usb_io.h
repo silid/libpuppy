@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.6 2004/12/15 02:49:23 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.7 2004/12/16 13:54:27 purbanec Exp $ */
 
 /*
 
@@ -112,6 +112,7 @@ struct typefile
 ssize_t send_success(int fd);
 ssize_t send_cancel(int fd);
 ssize_t send_cmd_reset(int fd);
+ssize_t send_cmd_turbo(int fd, int turbo_on);
 ssize_t send_cmd_hdd_size(int fd);
 ssize_t send_cmd_hdd_dir(int fd, char * path);
 ssize_t send_cmd_hdd_file_send(int fd, __u8 dir, char * path);
