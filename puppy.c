@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+/* $Id: puppy.c,v 1.2 2004/12/09 14:56:01 purbanec Exp $ */
 
 /*
 
@@ -33,8 +33,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <linux/usb.h>
-#include <linux/usbdevice_fs.h>
 #include <asm/byteorder.h>
 
 #include "usb_io.h"
