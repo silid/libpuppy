@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.4 2004/12/13 12:47:29 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.5 2004/12/14 16:22:42 purbanec Exp $ */
 
 /*
 
@@ -115,6 +115,8 @@ int send_cmd_reset(int fd);
 int send_cmd_hdd_size(int fd);
 int send_cmd_hdd_dir(int fd, char * path);
 int send_cmd_hdd_file_send(int fd, __u8 dir, char * path);
+int send_cmd_hdd_del(int fd, char * path);
+int send_cmd_hdd_rename(int fd, char * src, char * dst);
 
 void print_packet(struct tf_packet * packet, char * prefix);
 
