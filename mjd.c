@@ -1,4 +1,4 @@
-/* $Id: mjd.c,v 1.1 2004/12/23 05:39:13 purbanec Exp $ */
+/* $Id: mjd.c,v 1.2 2004/12/23 12:15:26 purbanec Exp $ */
 
 /*
 
@@ -33,10 +33,11 @@ time_t tfdt_to_time(struct tf_datetime * dt)
   int mjd = get_u16(&dt->mjd);
   int y, m, d, k;
   struct tm tm;
+  time_t result;
 
   y = (int) ((mjd - 15078.2) / 365.25);
   m = (int) ((mjd - 14956.1 - ((int) (y * 365.25))) / 30.6001);
-  d = mjd - 14956 - (((int) (y * 365.25)) - ((int) (m * 30.6001)));
+  d = mjd - 14956 - ((int) (y * 365.25)) - ((int) (m * 30.6001));
   if((m == 14) || (m == 15))
     {
       k = 1;
@@ -54,10 +55,12 @@ time_t tfdt_to_time(struct tf_datetime * dt)
   tm.tm_mday = d;
   tm.tm_mon = m - 1;
   tm.tm_year = y;
-  tm.tm_isdst = -1;
   tm.tm_wday = 0;
   tm.tm_yday = 0;
-  return (mktime(&tm));
+  tm.tm_isdst = -1;
+
+  result = mktime(&tm);
+  return result;
 }
 
 /* Convert itime_t to Topfield MJD date and time structure */
