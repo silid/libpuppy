@@ -1,4 +1,4 @@
-/* $Id: mjd.h,v 1.1 2004/12/23 05:39:13 purbanec Exp $ */
+/* $Id: mjd.h,v 1.2 2004/12/23 12:16:44 purbanec Exp $ */
 
 /*
 
@@ -22,6 +22,9 @@
 
 */
 
+#ifndef _MJD_H
+#define _MJD_H 1
+
 #include <time.h>
 #include <sys/types.h>
 #include <linux/types.h>
@@ -38,3 +41,5 @@ struct tf_datetime
 
 time_t tfdt_to_time(struct tf_datetime * dt);
 void time_to_tfdt(time_t t, struct tf_datetime * dt);
+
+#endif /* _MJD_H */
