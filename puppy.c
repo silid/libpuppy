@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.10 2004/12/16 13:54:27 purbanec Exp $ */
+/* $Id: puppy.c,v 1.11 2004/12/23 05:44:50 purbanec Exp $ */
 
 /*
 
@@ -370,10 +370,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 		struct typefile * tf = (struct typefile *) packet.data;
 		put_u16(&packet.length, PACKET_HEAD_SIZE + 114);
 		put_u32(&packet.cmd, DATA_HDD_FILE_START);
-		tf->mjd = 0;
-		tf->hour = 0;
-		tf->minute = 0;
-		tf->second = 0;
+                time_to_tfdt(srcStat.st_mtime, &tf->stamp);
 		tf->filetype = 2;
 		put_u64(&tf->size, srcStat.st_size);
 		strncpy((char *) tf->name, dstPath, 94);
@@ -466,7 +463,8 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
   struct tf_packet reply;
   __u64 byteCount = 0;
 
-  dst = open64(dstPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  dst = open64(dstPath, O_WRONLY | O_CREAT | O_TRUNC,
+               S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
   if(dst < 0)
     {
       fprintf(stderr, "Can not open destination file: %s\n", strerror(errno));
@@ -611,12 +609,12 @@ void do_hdd_rename(int fd, char * srcPath, char * dstPath)
 void usage(char * myName)
 {
   char * usageString =
-    "Usage: %s [-vpP] [-d <device>] -c <command> [args]\n"
-    " -v             - verbose output to stderr\n"
+    "Usage: %s [-pPtv] [-d <device>] -c <command> [args]\n"
     " -p             - packet header output to stderr\n"
     " -P             - full packet dump output to stderr\n"
     " -t             - turbo mode on for file xfers\n"
-    " -d <device>    - USB device (must be usbdevfs)\n"
+    " -v             - verbose output to stderr\n"
+    " -d <device>    - USB device (must be usbfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
     " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
     " args           - optional arguments, as required by each command\n";
