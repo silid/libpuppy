@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.11 2004/12/23 05:44:50 purbanec Exp $ */
+/* $Id: puppy.c,v 1.12 2004/12/23 12:23:36 purbanec Exp $ */
 
 /*
 
@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <utime.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -43,6 +45,8 @@
 #define GET 1
 
 #define MAX_DEVICES_LINE_SIZE 128
+
+extern time_t timezone;
 
 int verbose = 0;
 char * devPath = NULL;
@@ -71,6 +75,9 @@ int main(int argc, char * argv[])
   struct usb_config_descriptor confDesc;
   int fd = -1;
   int r;
+
+  // Initialise the timezone handling
+  tzset();
 
   r = parseArgs(argc, argv);
   if(r != 0)
@@ -175,7 +182,7 @@ void switch_turbo(int fd, int turbo_on)
   switch(get_u32(& reply.cmd))
     {
     case SUCCESS:
-      printf("Turbo mode: %s\n", turbo_on ? "On" : "Off");
+      trace(1, fprintf(stderr, "Turbo mode: %s\n", turbo_on ? "On" : "Off"));
       break;
       
     case FAIL:
@@ -301,6 +308,7 @@ void decode_dir(struct tf_packet * packet)
   __u16 count = (get_u16(&packet->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
   struct typefile *entries = (struct typefile *) packet->data;
   int i;
+  time_t timestamp;
   for(i = 0; (i < count); i++)
     {
       char type;
@@ -317,7 +325,13 @@ void decode_dir(struct tf_packet * packet)
 	default:
 	  type = '?';
 	}
-      printf("%c %20llu %s\n", type, get_u64(&entries[i].size), entries[i].name);
+
+      /* This makes the assumption that the timezone of the Toppy and the system
+       * that puppy runs on are the same. Given the limitations on the length of
+       * USB cables, this condition is likely to be satisfied. */
+      timestamp = tfdt_to_time(&entries[i].stamp);
+      printf("%c %20llu %24.24s %s\n", type, get_u64(&entries[i].size),
+	     ctime(&timestamp), entries[i].name);
     }
 }
 
@@ -410,6 +424,10 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 			return;
 		      }
 		  }
+
+		fprintf(stderr, "\r%3.2f%%",
+			100.0f * ((float) byteCount / (float) srcStat.st_size));
+
 	      }
 	      break;
 
@@ -446,6 +464,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath, int turbo_on)
 	}
     }
   close(src);
+  fprintf(stderr, "\n");
   switch_turbo(fd, 0);
 }
 
@@ -462,6 +481,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
   int r;
   struct tf_packet reply;
   __u64 byteCount = 0;
+  struct utimbuf mod_utime_buf = {0, 0};
 
   dst = open64(dstPath, O_WRONLY | O_CREAT | O_TRUNC,
                S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
@@ -475,7 +495,6 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
   r = send_cmd_hdd_file_send(fd, GET, srcPath);
   if(r < 0) return;
 
-  printf("\n");
   state = START;
   while((state != EXIT) && (0 < (r = get_tf_packet(fd, & reply))))
     {
@@ -486,7 +505,9 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 	    {
 	      struct typefile * tf = (struct typefile *) reply.data;
 	      byteCount = get_u64(&tf->size);
-	      send_success(fd);
+	      mod_utime_buf.actime = mod_utime_buf.modtime = tfdt_to_time(&tf->stamp);
+
+	      send_success(fd); 
 	      state = DATA;
 	    }
 	  else
@@ -504,10 +525,8 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 	      __u16 dataLen = get_u16(&reply.length) - (PACKET_HEAD_SIZE + 8);
 	      ssize_t w;
 
-	      printf("\r%3.2f%% %llu / %llu",
-		     100.0f * ((float) (offset + dataLen) / (float) byteCount),
-		     (offset + dataLen), byteCount);
-	      fflush(stdout);
+	      fprintf(stderr, "\r%3.2f%%",
+		      100.0f * ((float) (offset + dataLen) / (float) byteCount));
 
 	      if(r < get_u16(&reply.length))
 		{
@@ -556,7 +575,8 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath, int turbo_on)
 	}
     }
   close(dst);
-  printf("\n");
+  fprintf(stderr, "\n");
+  utime(dstPath, &mod_utime_buf);
   switch_turbo(fd, 0);
 }
 
@@ -784,13 +804,13 @@ char *findToppy(void)
 
     /* Store the information from topology lines. */
     if (sscanf(buffer, "T: Bus=%d Lev=%*d Prnt=%*d Port=%*d Cnt=%*d Dev#=%d", &bus, &device)) {
-      trace(1, printf("Found USB device at bus=%d, device=%d\n", bus, device));
+      trace(1, fprintf(stderr, "Found USB device at bus=%d, device=%d\n", bus, device));
     }
 
     /* Look for Topfield vendor/product lines, and also check for multiple devices. */
     else if (sscanf(buffer, "P: Vendor=%x ProdID=%x", &vendor, &prodid) &&
 	     (vendor == 0x11db) && (prodid == 0x1000)) {
-      trace(1, printf("Recognised Topfield device at bus=%d, device=%d\n", bus, device));
+      trace(1, fprintf(stderr, "Recognised Topfield device at bus=%d, device=%d\n", bus, device));
 
       /* If we've already found one, then there are multiple devices present. */
       if (found)
