@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.2 2004/12/10 16:43:02 purbanec Exp $ */
 
 /*
 
@@ -29,7 +29,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <linux/version.h>
 #include <asm/byteorder.h>
 #include "usb_io.h"
 #include "crc16.h"
@@ -367,11 +366,7 @@ void print_config_descriptor(struct usb_config_descriptor * desc)
   fprintf(stderr, "bConfigurationValue.....0x%02x\n", desc->bConfigurationValue);
   fprintf(stderr, "iConfiguration..........0x%02x\n", desc->iConfiguration);
   fprintf(stderr, "bmAttributes............0x%02x\n", desc->bmAttributes);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
   fprintf(stderr, "bMaxPower...............0x%02x\n\n", desc->bMaxPower);
-#else
-  fprintf(stderr, "MaxPower................0x%02x\n\n", desc->MaxPower);
-#endif
 }
 
 char * decode_error(struct tf_packet * packet)
