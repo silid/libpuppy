@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.5 2004/12/12 07:32:27 purbanec Exp $ */
+/* $Id: puppy.c,v 1.6 2004/12/13 12:52:11 purbanec Exp $ */
 
 /*
 
@@ -304,7 +304,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
   struct stat64 srcStat;
   __u64 byteCount = 0;
 
-  src = open64(srcPath, O_RDONLY);
+  src = open64(srcPath, O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
   if(src < 0)
     {
       fprintf(stderr, "Can not open source file: %s\n", strerror(errno));
@@ -525,8 +525,10 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
 
 void usage(char * myName)
 {
-  char * usage = "Usage: %s [-v] [-d <device>] -c <command> [args]\n"
+  char * usage = "Usage: %s [-vpP] [-d <device>] -c <command> [args]\n"
     " -v             - verbose output to stderr\n"
+    " -p             - packet header output to stderr\n"
+    " -P             - full packet dump output to stderr\n"
     " -d <device>    - USB device (must be usbdevfs)\n"
     "                  for example /proc/bus/usb/001/003\n"
     " -c <command>   - one of size, dir, get, put, reboot, cancel\n"
@@ -540,13 +542,20 @@ int parseArgs(int argc, char * argv[])
   extern int optind;
   int c;
 
-  while((c = getopt(argc, argv, "vd:c:")) != -1)
+  while((c = getopt(argc, argv, "pPvd:c:")) != -1)
     {
       switch(c)
 	{
 	case 'v':
-	  packet_trace = 1;
 	  verbose = 1;
+	  break;
+
+	case 'p':
+	  packet_trace = 1;
+	  break;
+
+	case 'P':
+	  packet_trace = 2;
 	  break;
 
 	case 'd':
@@ -580,15 +589,20 @@ int parseArgs(int argc, char * argv[])
 	}
     }
 
+  if(cmd == 0)
+    {
+      usage(argv[0]);
+      return -1;
+    }
+
   /* Search for a Toppy if the device is not specified */
   if(devPath == NULL)
     {
       devPath = findToppy();
     }
 
-  if((cmd == 0) || (devPath == NULL))
+  if(devPath == NULL)
     {
-      usage(argv[0]);
       return -1;
     }
 
@@ -634,9 +648,14 @@ char *findToppy(void)
   static char devPath[22];
 
   /* Open the /proc/bus/usb/devices file, and read it to find candidate Topfield devices. */
-  if ((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL) {
-    return NULL;
-  }
+  if ((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL)
+    {
+      fprintf(stderr,
+	      "ERROR: Can not perform autodetection.\n"
+	      "ERROR: /proc/bus/usb/devices can not be open for reading.\n"
+	      "ERROR: %s\n", strerror(errno));
+      return NULL;
+    }
 
   /* Scan the devices file, line by line, looking for Topfield devices. */
   while (fgets(buffer, MAX_DEVICES_LINE_SIZE, toppy)) {
@@ -652,10 +671,13 @@ char *findToppy(void)
       trace(1, printf("Recognised Topfield device at bus=%d, device=%d\n", bus, device));
 
       /* If we've already found one, then there are multiple devices present. */
-      if (found) {
-	trace(1, printf("Multiple Topfield devices recognised, aborting search\n"));
-	fclose(toppy);
-	return NULL;
+      if (found)
+	{
+	  fprintf(stderr,
+		  "ERROR: Multiple Topfield devices recognised.\n"
+		  "ERROR: Please use the -d option to specify a device.\n");
+	  fclose(toppy);
+	  return NULL;
       }
 
       /* Construct the devPath according to the topology found. */
@@ -665,5 +687,14 @@ char *findToppy(void)
   }
 
   fclose(toppy);
-  return devPath;
+
+  if(found)
+    {
+      return devPath;
+    }
+  else
+    {
+      fprintf(stderr, "ERROR: Can not autodetect a Topfield TF5000PVRt\n");
+      return NULL;
+    }
 }
