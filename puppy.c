@@ -1,4 +1,4 @@
-/* $Id: puppy.c,v 1.7 2004/12/14 16:26:41 purbanec Exp $ */
+/* $Id: puppy.c,v 1.8 2004/12/15 02:49:23 purbanec Exp $ */
 
 /*
 
@@ -51,10 +51,6 @@ char * arg1 = NULL;
 char * arg2 = NULL;
 __u8 sendDirection = GET;
 
-struct usb_device_descriptor devDesc;
-struct usb_config_descriptor confDesc;
-int fd = -1;
-
 int parseArgs(int argc, char * argv[]);
 int isToppy(struct usb_device_descriptor * desc);
 char *findToppy(void);
@@ -70,6 +66,9 @@ void do_hdd_rename(int fd, char * srcPath, char * dstPath);
 
 int main(int argc, char * argv[])
 {
+  struct usb_device_descriptor devDesc;
+  struct usb_config_descriptor confDesc;
+  int fd = -1;
   int r;
 
   r = parseArgs(argc, argv);
@@ -277,7 +276,6 @@ void decode_dir(struct tf_packet * packet)
   __u16 count = (get_u16(&packet->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
   struct typefile *entries = (struct typefile *) packet->data;
   int i;
-  //  for(i = 0; ((i < count) && entries[i].name[0] != '\0'); i++)
   for(i = 0; (i < count); i++)
     {
       char type;
@@ -315,7 +313,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
   struct stat64 srcStat;
   __u64 byteCount = 0;
 
-  src = open64(srcPath, O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  src = open64(srcPath, O_RDONLY);
   if(src < 0)
     {
       fprintf(stderr, "Can not open source file: %s\n", strerror(errno));
@@ -341,7 +339,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	    {
 	    case START:
 	      {
-		// Send start
+		/* Send start */
 		struct typefile * tf = (struct typefile *) packet.data;
 		put_u16(&packet.length, PACKET_HEAD_SIZE + 114);
 		put_u32(&packet.cmd, DATA_HDD_FILE_START);
@@ -351,7 +349,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 		tf->second = 0;
 		tf->filetype = 2;
 		put_u64(&tf->size, srcStat.st_size);
-		strncpy(tf->name, dstPath, 94);
+		strncpy((char *) tf->name, dstPath, 94);
 		tf->name[94] = '\0';
 		tf->unused = 0;
 		tf->attrib = 0;
@@ -373,7 +371,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 		put_u64(packet.data, byteCount);
 		byteCount += w;
 
-		// Detect EOF and transition to END
+		/* Detect EOF and transition to END */
 		if(w < payloadSize)
 		  {
 		    state = END;
@@ -392,7 +390,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	      break;
 
 	    case END:
-	      // Send end
+	      /* Send end */
 	      put_u16(&packet.length, PACKET_HEAD_SIZE);
 	      put_u32(&packet.cmd, DATA_HDD_FILE_END);
 	      r = send_tf_packet(fd, &packet);
@@ -408,7 +406,7 @@ void do_hdd_file_put(int fd, char * srcPath, char * dstPath)
 	      break;
 
 	    case EXIT:
-	      // Should not get here.
+	      /* Should not get here. */
 	      break;
 	    }
 	  break;
@@ -440,7 +438,7 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
   struct tf_packet reply;
   __u64 byteCount = 0;
 
-  dst = open64(dstPath, O_WRONLY | O_CREAT | O_TRUNC);
+  dst = open64(dstPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
   if(dst < 0)
     {
       fprintf(stderr, "Can not open destination file: %s\n", strerror(errno));
@@ -487,13 +485,13 @@ void do_hdd_file_get(int fd, char * srcPath, char * dstPath)
 	      if(r < get_u16(&reply.length))
 		{
 		  fprintf(stderr, "Short packet %d instead of %d\n", r, get_u16(&reply.length));
-		  // TODO: Fetch the rest of the packet
+		  /* TODO: Fetch the rest of the packet */
 		}
 
 	      w = write(dst, &reply.data[8], dataLen);
 	      if(w < dataLen)
 		{
-		  // Can't write data - abort transfer
+		  /* Can't write data - abort transfer */
 		  fprintf(stderr, "Error writing data: %s\n", strerror(errno));
 		  send_cancel(fd);
 		  state = ABORT;
@@ -582,7 +580,8 @@ void do_hdd_rename(int fd, char * srcPath, char * dstPath)
 
 void usage(char * myName)
 {
-  char * usage = "Usage: %s [-vpP] [-d <device>] -c <command> [args]\n"
+  char * usageString =
+    "Usage: %s [-vpP] [-d <device>] -c <command> [args]\n"
     " -v             - verbose output to stderr\n"
     " -p             - packet header output to stderr\n"
     " -P             - full packet dump output to stderr\n"
@@ -590,7 +589,7 @@ void usage(char * myName)
     "                  for example /proc/bus/usb/001/003\n"
     " -c <command>   - one of size, dir, get, put, rename, delete, reboot, cancel\n"
     " args           - optional arguments, as required by each command\n";
-  fprintf(stderr, usage, myName);
+  fprintf(stderr, usageString, myName);
 }
 
 int parseArgs(int argc, char * argv[])
@@ -708,7 +707,7 @@ int parseArgs(int argc, char * argv[])
 
   if(cmd == CMD_HDD_RENAME)
     {
-      // TODO: Re-enable once it is working
+      /* TODO: Re-enable once it is working */
       fprintf(stderr, "ERROR: Rename is currently disabled. Attempting a rename will destroy the source file.\n");
       return -1;
 
@@ -729,16 +728,17 @@ int parseArgs(int argc, char * argv[])
 
 int isToppy(struct usb_device_descriptor * desc)
 {
-  return (devDesc.idVendor == 0x11db) && (devDesc.idProduct == 0x1000);
+  return (desc->idVendor == 0x11db) && (desc->idProduct == 0x1000);
 }
 
 char *findToppy(void)
 {
   FILE *toppy;
   char buffer[MAX_DEVICES_LINE_SIZE];
-  int bus, device, vendor, prodid;
+  int bus, device;
+  unsigned int vendor, prodid;
   int found = 0;
-  static char devPath[22];
+  static char pathBuffer[32];
 
   /* Open the /proc/bus/usb/devices file, and read it to find candidate Topfield devices. */
   if ((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL)
@@ -773,8 +773,8 @@ char *findToppy(void)
 	  return NULL;
       }
 
-      /* Construct the devPath according to the topology found. */
-      sprintf(devPath, "/proc/bus/usb/%03d/%03d", bus, device);
+      /* Construct the device path according to the topology found. */
+      sprintf(pathBuffer, "/proc/bus/usb/%03d/%03d", bus, device);
       found = 1;
     }
   }
@@ -783,7 +783,7 @@ char *findToppy(void)
 
   if(found)
     {
-      return devPath;
+      return pathBuffer;
     }
   else
     {

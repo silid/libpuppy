@@ -1,4 +1,4 @@
-/* $Id: tf_bytes.h,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+/* $Id: tf_bytes.h,v 1.2 2004/12/15 02:49:23 purbanec Exp $ */
 
 /*
 
@@ -35,4 +35,4 @@ void put_u16(void * addr, __u16 val);
 void put_u32(void * addr, __u32 val);
 void put_u64(void * addr, __u64 val);
 
-#endif // _TF_BYTES_H
+#endif /* _TF_BYTES_H */

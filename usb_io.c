@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.5 2004/12/14 16:24:26 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.6 2004/12/15 02:49:23 purbanec Exp $ */
 
 /*
 
@@ -46,9 +46,9 @@
  * transmission.
  */
 
-// 0 - disable tracing
-// 1 - show packet headers
-// 2+ - dump entire packet
+/* 0 - disable tracing */
+/* 1 - show packet headers */
+/* 2+ - dump entire packet */
 int packet_trace = 0;
 
 void byte_swap(struct tf_packet * packet)
@@ -65,7 +65,7 @@ void byte_swap(struct tf_packet * packet)
     }
 }
 
-int send_cancel(int fd)
+ssize_t send_cancel(int fd)
 {
   struct tf_packet req;
   put_u16(&req.length, 8);
@@ -73,7 +73,7 @@ int send_cancel(int fd)
   return send_tf_packet(fd, &req);
 }
 
-int send_success(int fd)
+ssize_t send_success(int fd)
 {
   struct tf_packet req;
   put_u16(&req.length, 8);
@@ -81,7 +81,7 @@ int send_success(int fd)
   return send_tf_packet(fd, &req);
 }
 
-int send_cmd_reset(int fd)
+ssize_t send_cmd_reset(int fd)
 {
   struct tf_packet req;
   put_u16(&req.length, 8);
@@ -89,7 +89,7 @@ int send_cmd_reset(int fd)
   return send_tf_packet(fd, &req);
 }
 
-int send_cmd_hdd_size(int fd)
+ssize_t send_cmd_hdd_size(int fd)
 {
   struct tf_packet req;
   put_u16(&req.length, 8);
@@ -102,7 +102,7 @@ __u16 get_crc(struct tf_packet * packet)
   return crc16_ansi(&(packet->cmd), get_u16(&packet->length) - 4);
 }
 
-int send_cmd_hdd_dir(int fd, char * path)
+ssize_t send_cmd_hdd_dir(int fd, char * path)
 {
   struct tf_packet req;
   __u16 packetSize;
@@ -118,7 +118,7 @@ int send_cmd_hdd_dir(int fd, char * path)
   packetSize = (packetSize + 1) & ~1;
   put_u16(&req.length, packetSize);
   put_u32(&req.cmd, CMD_HDD_DIR);
-  strcpy(req.data, path);
+  strcpy((char *) req.data, path);
   return send_tf_packet(fd, &req);
 }
 
@@ -140,11 +140,11 @@ int send_cmd_hdd_file_send(int fd, __u8 dir, char * path)
   put_u32(&req.cmd, CMD_HDD_FILE_SEND);
   req.data[0] = dir;
   put_u16(&req.data[1], pathLen);
-  strcpy(&req.data[3], path);
+  strcpy((char *) &req.data[3], path);
   return send_tf_packet(fd, &req);
 }
 
-int send_cmd_hdd_del(int fd, char * path)
+ssize_t send_cmd_hdd_del(int fd, char * path)
 {
   struct tf_packet req;
   __u16 packetSize;
@@ -160,11 +160,11 @@ int send_cmd_hdd_del(int fd, char * path)
   packetSize = (packetSize + 1) & ~1;
   put_u16(&req.length, packetSize);
   put_u32(&req.cmd, CMD_HDD_DEL);
-  strcpy(req.data, path);
+  strcpy((char *) req.data, path);
   return send_tf_packet(fd, &req);
 }
 
-int send_cmd_hdd_rename(int fd, char * src, char * dst)
+ssize_t send_cmd_hdd_rename(int fd, char * src, char * dst)
 {
   struct tf_packet req;
   __u16 packetSize;
@@ -182,9 +182,9 @@ int send_cmd_hdd_rename(int fd, char * src, char * dst)
   put_u16(&req.length, packetSize);
   put_u32(&req.cmd, CMD_HDD_FILE_SEND);
   put_u16(&req.data[0], srcLen);
-  strcpy(&req.data[2], src);
+  strcpy((char *) &req.data[2], src);
   put_u16(&req.data[2 + srcLen], dstLen);
-  strcpy(&req.data[2 + srcLen + 2], dst);
+  strcpy((char *) &req.data[2 + srcLen + 2], dst);
   return send_tf_packet(fd, &req);
 }
 
@@ -197,7 +197,7 @@ void print_packet(struct tf_packet * packet, char * prefix)
   switch(packet_trace)
     {
     case 0:
-      // Do nothing
+      /* Do nothing */
       break;
 
     case 1:
@@ -236,13 +236,13 @@ void print_packet(struct tf_packet * packet, char * prefix)
 
 /* Given a Topfield protocol packet, this function will calculate the required
  * CRC and send the packet out over a bulk pipe. */
-int send_tf_packet(int fd, struct tf_packet * packet)
+ssize_t send_tf_packet(int fd, struct tf_packet * packet)
 {
   __u16 pl = get_u16(&packet->length);
   if(pl % 2)
     {
       fprintf(stderr, "WARNING: packet size is odd (not even)\n");
-      // Have to send an extra byte to preserve the byteswapped odd byte
+      /* Have to send an extra byte to preserve the byteswapped odd byte */
       pl++;
     }
   put_u16(&packet->crc, get_crc(packet));
@@ -254,7 +254,7 @@ int send_tf_packet(int fd, struct tf_packet * packet)
 /* Receive a Topfield protocol packet.
  * Returns a negative number if the packet read failed for some reason.
  */
-int get_tf_packet(int fd, struct tf_packet * packet)
+ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 {
   __u8 *buf = (__u8 *)packet;
   int r;
@@ -281,7 +281,7 @@ int get_tf_packet(int fd, struct tf_packet * packet)
     crc = get_u16(&packet->crc);
     calc_crc = get_crc(packet);
 
-    // Complain about CRC mismatch
+    /* Complain about CRC mismatch */
     if(crc != calc_crc)
       {
 	fprintf(stderr, "WARNING: Packet CRC %04x, expected %04x\n", crc, calc_crc);
@@ -298,11 +298,11 @@ int get_tf_packet(int fd, struct tf_packet * packet)
 #define MAX_READ_WRITE	4096
 
 /* This function is adapted from libusb */
-int usb_bulk_write(int fd, int ep, __u8 * bytes, size_t length, int timeout)
+ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length, int timeout)
 {
   struct usbdevfs_bulktransfer bulk;
-  int ret;
-  size_t sent = 0;
+  ssize_t ret;
+  ssize_t sent = 0;
 
   /* Ensure the endpoint direction is correct */
   ep &= ~USB_ENDPOINT_DIR_MASK;
@@ -332,12 +332,12 @@ int usb_bulk_write(int fd, int ep, __u8 * bytes, size_t length, int timeout)
 }
 
 /* This function is adapted from libusb */
-int usb_bulk_read(int fd, int ep, __u8 * bytes, size_t size, int timeout)
+ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
 {
   struct usbdevfs_bulktransfer bulk;
-  int ret;
-  size_t retrieved = 0;
-  size_t requested;
+  ssize_t ret;
+  ssize_t retrieved = 0;
+  ssize_t requested;
 
   /* Ensure the endpoint address is correct */
   ep |= USB_ENDPOINT_DIR_MASK;
@@ -368,7 +368,7 @@ int usb_bulk_read(int fd, int ep, __u8 * bytes, size_t size, int timeout)
   return retrieved;
 }
 
-int read_device_descriptor(const int fd, struct usb_device_descriptor * desc)
+ssize_t read_device_descriptor(const int fd, struct usb_device_descriptor * desc)
 {
   int r = read(fd, desc, USB_DT_DEVICE_SIZE);
   if(r != USB_DT_DEVICE_SIZE)
@@ -379,7 +379,7 @@ int read_device_descriptor(const int fd, struct usb_device_descriptor * desc)
   return r;
 }
 
-int read_config_descriptor(const int fd, struct usb_config_descriptor * desc)
+ssize_t read_config_descriptor(const int fd, struct usb_config_descriptor * desc)
 {
   int r = read(fd, desc, USB_DT_CONFIG_SIZE);
   if(r != USB_DT_CONFIG_SIZE)
@@ -394,10 +394,10 @@ int read_config_descriptor(const int fd, struct usb_config_descriptor * desc)
   return r;
 }
 
-int discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t descSize)
+ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t descSize)
 {
   int r;
-  // If the descriptor is bigger than standard, read remaining data and discard
+  /* If the descriptor is bigger than standard, read remaining data and discard */
   if(desc->bLength > descSize)
     {
       __u8 *extra;
@@ -427,7 +427,7 @@ int discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t
 
 void print_device_descriptor(struct usb_device_descriptor * desc)
 {
-  fprintf(stderr, "\nusb_device_descriptor 0x%p\n", desc);
+  fprintf(stderr, "\nusb_device_descriptor 0x%p\n", (void *) desc);
   fprintf(stderr, "bLength.................0x%02x\n", desc->bLength);
   fprintf(stderr, "bDescriptorType.........0x%02x\n", desc->bDescriptorType);
   fprintf(stderr, "bcdUSB..................0x%04x\n", desc->bcdUSB);
@@ -446,7 +446,7 @@ void print_device_descriptor(struct usb_device_descriptor * desc)
 
 void print_config_descriptor(struct usb_config_descriptor * desc)
 {
-  fprintf(stderr, "\nusb_config_descriptor 0x%p\n", desc);
+  fprintf(stderr, "\nusb_config_descriptor 0x%p\n", (void *) desc);
   fprintf(stderr, "bLength.................0x%02x\n", desc->bLength);
   fprintf(stderr, "bDescriptorType.........0x%02x\n", desc->bDescriptorType);
   fprintf(stderr, "wTotalLength............0x%04x\n", desc->wTotalLength);

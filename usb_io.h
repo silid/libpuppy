@@ -1,4 +1,4 @@
-/* $Id: usb_io.h,v 1.5 2004/12/14 16:22:42 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.6 2004/12/15 02:49:23 purbanec Exp $ */
 
 /*
 
@@ -69,9 +69,9 @@
 /* Number of milliseconds to wait for a packet transfer to complete. */
 #define TF_PROTOCOL_TIMEOUT 1000
 
-// 0 - disable tracing
-// 1 - show packet headers
-// 2+ - dump entire packet
+/* 0 - disable tracing */
+/* 1 - show packet headers */
+/* 2+ - dump entire packet */
 extern int packet_trace;
 
 /* The maximum packet size used by the Toppy. This happens to be an
@@ -109,30 +109,30 @@ struct typefile
 } __attribute__ ((packed));
 
 
-int send_success(int fd);
-int send_cancel(int fd);
-int send_cmd_reset(int fd);
-int send_cmd_hdd_size(int fd);
-int send_cmd_hdd_dir(int fd, char * path);
-int send_cmd_hdd_file_send(int fd, __u8 dir, char * path);
-int send_cmd_hdd_del(int fd, char * path);
-int send_cmd_hdd_rename(int fd, char * src, char * dst);
+ssize_t send_success(int fd);
+ssize_t send_cancel(int fd);
+ssize_t send_cmd_reset(int fd);
+ssize_t send_cmd_hdd_size(int fd);
+ssize_t send_cmd_hdd_dir(int fd, char * path);
+ssize_t send_cmd_hdd_file_send(int fd, __u8 dir, char * path);
+ssize_t send_cmd_hdd_del(int fd, char * path);
+ssize_t send_cmd_hdd_rename(int fd, char * src, char * dst);
 
 void print_packet(struct tf_packet * packet, char * prefix);
 
-int get_tf_packet(int fd, struct tf_packet * packet);
-int send_tf_packet(int fd, struct tf_packet * packet);
+ssize_t get_tf_packet(int fd, struct tf_packet * packet);
+ssize_t send_tf_packet(int fd, struct tf_packet * packet);
 
-int usb_bulk_read(int fd, int ep, __u8 * bytes, size_t size, int timeout);
-int usb_bulk_write(int fd, int ep, __u8 * bytes, size_t length, int timeout);
+ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout);
+ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length, int timeout);
 
-int read_device_descriptor(const int fd, struct usb_device_descriptor * desc);
-int read_config_descriptor(const int fd, struct usb_config_descriptor * desc);
-int discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t descSize);
+ssize_t read_device_descriptor(const int fd, struct usb_device_descriptor * desc);
+ssize_t read_config_descriptor(const int fd, struct usb_config_descriptor * desc);
+ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t descSize);
 
 void print_device_descriptor(struct usb_device_descriptor * desc);
 void print_config_descriptor(struct usb_config_descriptor * desc);
 
 char * decode_error(struct tf_packet * packet);
 
-#endif // _USB_IO_H
+#endif /* _USB_IO_H */
