@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.7 2004/12/15 07:27:16 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.8 2004/12/15 14:35:11 purbanec Exp $ */
 
 /*
 
@@ -388,7 +388,7 @@ ssize_t read_config_descriptor(const int fd, struct usb_config_descriptor * desc
       return -1;
     }
 
-  desc->wTotalLength = __le16_to_cpu(desc->wTotalLength);
+  desc->wTotalLength = get_u16(&desc->wTotalLength);
 
   r = discard_extra_desc_data(fd, (struct usb_descriptor_header *) desc, USB_DT_CONFIG_SIZE);
   return r;
