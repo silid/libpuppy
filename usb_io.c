@@ -1,4 +1,4 @@
-/* $Id: usb_io.c,v 1.8 2004/12/15 14:35:11 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.9 2004/12/18 00:46:39 purbanec Exp $ */
 
 /*
 
@@ -86,6 +86,15 @@ ssize_t send_cmd_reset(int fd)
   struct tf_packet req;
   put_u16(&req.length, 8);
   put_u32(&req.cmd, CMD_RESET);
+  return send_tf_packet(fd, &req);
+}
+
+ssize_t send_cmd_turbo(int fd, int turbo_on)
+{
+  struct tf_packet req;
+  put_u16(&req.length, 12);
+  put_u32(&req.cmd, CMD_TURBO);
+  put_u32(&req.data, turbo_on);
   return send_tf_packet(fd, &req);
 }
 
