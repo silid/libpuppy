@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.17 2005/01/18 14:00:46 purbanec Exp $ */
+/* $Id: puppy.c,v 1.18 2005/03/01 01:21:25 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -105,6 +105,19 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    {
+        int interface = 0;
+
+        r = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &interface);
+        if(r < 0)
+        {
+            fprintf(stderr, "Can not claim interface 0: %s\n",
+                    strerror(errno));
+            close(fd);
+            return 5;
+        }
+    }
+
     r = read_device_descriptor(fd, &devDesc);
     if(r < 0)
     {
@@ -126,17 +139,6 @@ int main(int argc, char *argv[])
     {
         close(fd);
         return 4;
-    }
-
-    {
-        int interface = 0;
-
-        r = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &interface);
-        if(r < 0)
-        {
-            fprintf(stderr, "Can not claim interface 0: %s\n",
-                    strerror(errno));
-        }
     }
 
     switch (cmd)
