@@ -1,4 +1,5 @@
-/* $Id: usb_io.h,v 1.9 2005/01/04 14:15:04 purbanec Exp $ */
+
+/* $Id: usb_io.h,v 1.10 2005/01/18 14:00:47 purbanec Exp $ */
 
 /*
 
@@ -69,9 +70,10 @@
 /* Number of milliseconds to wait for a packet transfer to complete. */
 #define TF_PROTOCOL_TIMEOUT 1000
 
-/* 0 - disable tracing */
-/* 1 - show packet headers */
-/* 2+ - dump entire packet */
+/* 0 - disable tracing
+   1 - show packet headers
+   2+ - dump entire packet
+ */
 extern int packet_trace;
 
 /* The maximum packet size used by the Toppy. This happens to be an
@@ -88,21 +90,21 @@ extern int packet_trace;
 /* Format of a Topfield protocol packet */
 struct tf_packet
 {
-  __u16 length;
-  __u16 crc;
-  __u32 cmd;
-  __u8 data[MAXIMUM_PACKET_SIZE - PACKET_HEAD_SIZE];
-}  __attribute__ ((packed));
+    __u16 length;
+    __u16 crc;
+    __u32 cmd;
+    __u8 data[MAXIMUM_PACKET_SIZE - PACKET_HEAD_SIZE];
+} __attribute__ ((packed));
 
 /* Topfield file descriptor data structure. */
 struct typefile
 {
-  struct tf_datetime stamp;
-  __u8 filetype;
-  __u64 size;
-  __u8 name[95];
-  __u8 unused;
-  __u32 attrib;
+    struct tf_datetime stamp;
+    __u8 filetype;
+    __u64 size;
+    __u8 name[95];
+    __u8 unused;
+    __u32 attrib;
 } __attribute__ ((packed));
 
 
@@ -111,27 +113,32 @@ ssize_t send_cancel(int fd);
 ssize_t send_cmd_reset(int fd);
 ssize_t send_cmd_turbo(int fd, int turbo_on);
 ssize_t send_cmd_hdd_size(int fd);
-ssize_t send_cmd_hdd_dir(int fd, char * path);
-ssize_t send_cmd_hdd_file_send(int fd, __u8 dir, char * path);
-ssize_t send_cmd_hdd_del(int fd, char * path);
-ssize_t send_cmd_hdd_rename(int fd, char * src, char * dst);
-ssize_t send_cmd_hdd_create_dir(int fd, char * path);
+ssize_t send_cmd_hdd_dir(int fd, char *path);
+ssize_t send_cmd_hdd_file_send(int fd, __u8 dir, char *path);
+ssize_t send_cmd_hdd_del(int fd, char *path);
+ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst);
+ssize_t send_cmd_hdd_create_dir(int fd, char *path);
 
-void print_packet(struct tf_packet * packet, char * prefix);
+void print_packet(struct tf_packet *packet, char *prefix);
 
-ssize_t get_tf_packet(int fd, struct tf_packet * packet);
-ssize_t send_tf_packet(int fd, struct tf_packet * packet);
+ssize_t get_tf_packet(int fd, struct tf_packet *packet);
+ssize_t send_tf_packet(int fd, struct tf_packet *packet);
 
-ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout);
-ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length, int timeout);
+ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size,
+                      int timeout);
+ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
+                       int timeout);
 
-ssize_t read_device_descriptor(const int fd, struct usb_device_descriptor * desc);
-ssize_t read_config_descriptor(const int fd, struct usb_config_descriptor * desc);
-ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc, ssize_t descSize);
+ssize_t read_device_descriptor(const int fd,
+                               struct usb_device_descriptor *desc);
+ssize_t read_config_descriptor(const int fd,
+                               struct usb_config_descriptor *desc);
+ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header *desc,
+                                ssize_t descSize);
 
-void print_device_descriptor(struct usb_device_descriptor * desc);
-void print_config_descriptor(struct usb_config_descriptor * desc);
+void print_device_descriptor(struct usb_device_descriptor *desc);
+void print_config_descriptor(struct usb_config_descriptor *desc);
 
-char * decode_error(struct tf_packet * packet);
+char *decode_error(struct tf_packet *packet);
 
 #endif /* _USB_IO_H */

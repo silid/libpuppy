@@ -1,4 +1,5 @@
-/* $Id: mjd.h,v 1.2 2004/12/23 12:16:44 purbanec Exp $ */
+
+/* $Id: mjd.h,v 1.3 2005/01/18 14:00:46 purbanec Exp $ */
 
 /*
 
@@ -32,14 +33,14 @@
 /* Encapsulation of MJD date and h:m:s timestamp */
 struct tf_datetime
 {
-  __u16 mjd;
-  __u8 hour;
-  __u8 minute;
-  __u8 second;
+    __u16 mjd;
+    __u8 hour;
+    __u8 minute;
+    __u8 second;
 } __attribute__ ((packed));
 
 
-time_t tfdt_to_time(struct tf_datetime * dt);
-void time_to_tfdt(time_t t, struct tf_datetime * dt);
+time_t tfdt_to_time(struct tf_datetime *dt);
+void time_to_tfdt(time_t t, struct tf_datetime *dt);
 
 #endif /* _MJD_H */

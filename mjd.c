@@ -1,4 +1,5 @@
-/* $Id: mjd.c,v 1.2 2004/12/23 12:15:26 purbanec Exp $ */
+
+/* $Id: mjd.c,v 1.3 2005/01/18 14:00:46 purbanec Exp $ */
 
 /*
 
@@ -30,63 +31,62 @@
 /* Convert Topfield MJD date and time structure to time_t */
 time_t tfdt_to_time(struct tf_datetime * dt)
 {
-  int mjd = get_u16(&dt->mjd);
-  int y, m, d, k;
-  struct tm tm;
-  time_t result;
+    int mjd = get_u16(&dt->mjd);
+    int y, m, d, k;
+    struct tm tm;
+    time_t result;
 
-  y = (int) ((mjd - 15078.2) / 365.25);
-  m = (int) ((mjd - 14956.1 - ((int) (y * 365.25))) / 30.6001);
-  d = mjd - 14956 - ((int) (y * 365.25)) - ((int) (m * 30.6001));
-  if((m == 14) || (m == 15))
+    y = (int) ((mjd - 15078.2) / 365.25);
+    m = (int) ((mjd - 14956.1 - ((int) (y * 365.25))) / 30.6001);
+    d = mjd - 14956 - ((int) (y * 365.25)) - ((int) (m * 30.6001));
+    if((m == 14) || (m == 15))
     {
-      k = 1;
+        k = 1;
     }
-  else
+    else
     {
-      k = 0;
+        k = 0;
     }
-  y += k;
-  m = m - 1 - k * 12;
+    y += k;
+    m = m - 1 - k * 12;
 
-  tm.tm_sec = dt->second;
-  tm.tm_min = dt->minute;
-  tm.tm_hour = dt->hour;
-  tm.tm_mday = d;
-  tm.tm_mon = m - 1;
-  tm.tm_year = y;
-  tm.tm_wday = 0;
-  tm.tm_yday = 0;
-  tm.tm_isdst = -1;
+    tm.tm_sec = dt->second;
+    tm.tm_min = dt->minute;
+    tm.tm_hour = dt->hour;
+    tm.tm_mday = d;
+    tm.tm_mon = m - 1;
+    tm.tm_year = y;
+    tm.tm_wday = 0;
+    tm.tm_yday = 0;
+    tm.tm_isdst = -1;
 
-  result = mktime(&tm);
-  return result;
+    result = mktime(&tm);
+    return result;
 }
 
 /* Convert itime_t to Topfield MJD date and time structure */
-void time_to_tfdt(time_t t, struct tf_datetime * dt)
+void time_to_tfdt(time_t t, struct tf_datetime *dt)
 {
-  int y, m, d, k, mjd;
-  struct tm * tm = localtime(&t);
+    int y, m, d, k, mjd;
+    struct tm *tm = localtime(&t);
 
-  y = tm->tm_year;
-  m = tm->tm_mon + 1;
-  d = tm->tm_mday;
+    y = tm->tm_year;
+    m = tm->tm_mon + 1;
+    d = tm->tm_mday;
 
-  if((m == 1) || (m == 2))
+    if((m == 1) || (m == 2))
     {
-      k = 1;
+        k = 1;
     }
-  else
+    else
     {
-      k = 0;
+        k = 0;
     }
 
-  mjd = 14956 + d +
-    ((int) ((y - k) * 365.25)) +
-    ((int) ((m + 1 + k * 12) * 30.6001));
-  put_u16(&dt->mjd, mjd);
-  dt->hour = tm->tm_hour;
-  dt->minute = tm->tm_min;
-  dt->second = tm->tm_sec;
+    mjd = 14956 + d +
+        ((int) ((y - k) * 365.25)) + ((int) ((m + 1 + k * 12) * 30.6001));
+    put_u16(&dt->mjd, mjd);
+    dt->hour = tm->tm_hour;
+    dt->minute = tm->tm_min;
+    dt->second = tm->tm_sec;
 }

@@ -1,4 +1,5 @@
-/* $Id: tf_bytes.c,v 1.2 2005/01/17 14:03:53 purbanec Exp $ */
+
+/* $Id: tf_bytes.c,v 1.3 2005/01/18 14:00:47 purbanec Exp $ */
 
 /*
 
@@ -37,74 +38,71 @@
  * The USB I/O layer then takes care of CRC generation and byte swapping.
  */
 
-__u16 get_u16(void * addr)
+__u16 get_u16(void *addr)
 {
-  __u8 *b = addr;
-  return
-    ((b[0] << 8) & 0xff00) |
-    ((b[1] << 0) & 0x00ff);
+    __u8 *b = addr;
+
+    return ((b[0] << 8) & 0xff00) | ((b[1] << 0) & 0x00ff);
 }
 
-void put_u16(void * addr, __u16 val)
+void put_u16(void *addr, __u16 val)
 {
-  __u8 *b = addr;
-  b[0] = (val >> 8) & 0xFF;
-  b[1] = (val & 0xFF);
+    __u8 *b = addr;
+
+    b[0] = (val >> 8) & 0xFF;
+    b[1] = (val & 0xFF);
 }
 
-__u32 get_u32(void * addr)
+__u32 get_u32(void *addr)
 {
-  __u8 *b = addr;
-  return
-    (b[0] << 24) |
-    (b[1] << 16) |
-    (b[2] <<  8) |
-    (b[3]);
+    __u8 *b = addr;
+
+    return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | (b[3]);
 }
 
 /* Retrieve a 32-bit integer from the raw buffer (prior to byteswapping) */
-__u32 get_u32_raw(void * addr)
+__u32 get_u32_raw(void *addr)
 {
-  __u8 *b = addr;
-  return
-    (b[1] << 24) |
-    (b[0] << 16) |
-    (b[3] <<  8) |
-    (b[2]);
+    __u8 *b = addr;
+
+    return (b[1] << 24) | (b[0] << 16) | (b[3] << 8) | (b[2]);
 }
 
-void put_u32(void * addr, __u32 val)
+void put_u32(void *addr, __u32 val)
 {
-  __u8 *b = addr;
-  b[0] = (val >> 24) & 0xFF;
-  b[1] = (val >> 16) & 0xFF;
-  b[2] = (val >> 8) & 0xFF;
-  b[3] = (val & 0xFF);
+    __u8 *b = addr;
+
+    b[0] = (val >> 24) & 0xFF;
+    b[1] = (val >> 16) & 0xFF;
+    b[2] = (val >> 8) & 0xFF;
+    b[3] = (val & 0xFF);
 }
 
-__u64 get_u64(void * addr)
+__u64 get_u64(void *addr)
 {
-  __u8 *b = addr;
-  __u64 r = b[0];
-  r = (r << 8) | b[1];
-  r = (r << 8) | b[2];
-  r = (r << 8) | b[3];
-  r = (r << 8) | b[4];
-  r = (r << 8) | b[5];
-  r = (r << 8) | b[6];
-  r = (r << 8) | b[7];
-  return r;
+    __u8 *b = addr;
+    __u64 r = b[0];
+
+    r = (r << 8) | b[1];
+    r = (r << 8) | b[2];
+    r = (r << 8) | b[3];
+    r = (r << 8) | b[4];
+    r = (r << 8) | b[5];
+    r = (r << 8) | b[6];
+    r = (r << 8) | b[7];
+    return r;
 }
 
-void put_u64(void * addr, __u64 val)
+void put_u64(void *addr, __u64 val)
 {
-  __u8 *b = addr;
-  b[0] = (val >> 56) & 0xFF;
-  b[1] = (val >> 48) & 0xFF;
-  b[2] = (val >> 40) & 0xFF;
-  b[3] = (val >> 32) & 0xFF;
-  b[4] = (val >> 24) & 0xFF;
-  b[5] = (val >> 16) & 0xFF;
-  b[6] = (val >> 8) & 0xFF;
-  b[7] = (val & 0xFF);
+    __u8 *b = addr;
+
+    b[0] = (val >> 56) & 0xFF;
+    b[1] = (val >> 48) & 0xFF;
+    b[2] = (val >> 40) & 0xFF;
+    b[3] = (val >> 32) & 0xFF;
+    b[4] = (val >> 24) & 0xFF;
+    b[5] = (val >> 16) & 0xFF;
+    b[6] = (val >> 8) & 0xFF;
+    b[7] = (val & 0xFF);
 }

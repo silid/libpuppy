@@ -1,4 +1,5 @@
-/* $Id: crc16.h,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+
+/* $Id: crc16.h,v 1.2 2005/01/18 14:00:46 purbanec Exp $ */
 
 /*
 
@@ -25,4 +26,4 @@
 #include <sys/types.h>
 #include <asm/types.h>
 
-__u16 crc16_ansi(const void * data, size_t size);
+__u16 crc16_ansi(const void *data, size_t size);

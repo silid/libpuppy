@@ -1,4 +1,5 @@
-/* $Id: crc16.c,v 1.1 2004/12/08 12:59:38 purbanec Exp $ */
+
+/* $Id: crc16.c,v 1.2 2005/01/18 14:00:46 purbanec Exp $ */
 
 /*
 
@@ -25,8 +26,7 @@
 #include <stdio.h>
 #include "crc16.h"
 
-static __u16 crc_16_table[256] =
-  {
+static __u16 crc_16_table[256] = {
     0x0000, 0xc0c1, 0xc181, 0x0140, 0xc301, 0x03c0, 0x0280, 0xc241,
     0xc601, 0x06c0, 0x0780, 0xc741, 0x0500, 0xc5c1, 0xc481, 0x0440,
     0xcc01, 0x0cc0, 0x0d80, 0xcd41, 0x0f00, 0xcfc1, 0xce81, 0x0e40,
@@ -59,17 +59,17 @@ static __u16 crc_16_table[256] =
     0x4e00, 0x8ec1, 0x8f81, 0x4f40, 0x8d01, 0x4dc0, 0x4c80, 0x8c41,
     0x4400, 0x84c1, 0x8581, 0x4540, 0x8701, 0x47c0, 0x4680, 0x8641,
     0x8201, 0x42c0, 0x4380, 0x8341, 0x4100, 0x81c1, 0x8081, 0x4040
-  };
+};
 
-__u16 crc16_ansi(const void * data, size_t size)
+__u16 crc16_ansi(const void *data, size_t size)
 {
-  __u16	crc = 0;
-  const __u8 * d = data;
+    __u16 crc = 0;
+    const __u8 *d = data;
 
-  while(size--)
+    while(size--)
     {
-      crc = crc_16_table[(crc ^ *d++) & 0xff] ^ (crc >> 8);
+        crc = crc_16_table[(crc ^ *d++) & 0xff] ^ (crc >> 8);
     }
 
-  return crc;
+    return crc;
 }

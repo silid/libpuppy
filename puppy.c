@@ -1,8 +1,8 @@
 
-/* $Id: puppy.c,v 1.16 2005/01/17 14:03:47 purbanec Exp $ */
+/* $Id: puppy.c,v 1.17 2005/01/18 14:00:46 purbanec Exp $ */
 
 /* Format using indent and the following options:
--bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp
+-bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
 */
 
 /*
@@ -80,8 +80,7 @@ void do_hdd_mkdir(int fd, char *path);
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
 void finalStats(__u64 bytes, time_t startTime);
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     struct usb_device_descriptor devDesc;
     struct usb_config_descriptor confDesc;
@@ -187,8 +186,7 @@ main(int argc, char *argv[])
     return 0;
 }
 
-void
-switch_turbo(int fd, int turbo_on)
+void switch_turbo(int fd, int turbo_on)
 {
     int r;
 
@@ -220,8 +218,8 @@ switch_turbo(int fd, int turbo_on)
             fprintf(stderr, "Unhandled packet\n");
     }
 }
-void
-do_cmd_reset(int fd)
+
+void do_cmd_reset(int fd)
 {
     int r;
 
@@ -252,8 +250,7 @@ do_cmd_reset(int fd)
     }
 }
 
-void
-do_cancel(int fd)
+void do_cancel(int fd)
 {
     int r;
 
@@ -284,8 +281,7 @@ do_cancel(int fd)
     }
 }
 
-void
-do_hdd_size(int fd)
+void do_hdd_size(int fd)
 {
     int r;
 
@@ -324,8 +320,7 @@ do_hdd_size(int fd)
     }
 }
 
-void
-do_hdd_dir(int fd, char *path)
+void do_hdd_dir(int fd, char *path)
 {
     char getAnotherPacket = 1;
     int r;
@@ -360,8 +355,7 @@ do_hdd_dir(int fd, char *path)
     }
 }
 
-void
-decode_dir(struct tf_packet *p)
+void decode_dir(struct tf_packet *p)
 {
     __u16 count =
         (get_u16(&p->length) - PACKET_HEAD_SIZE) / sizeof(struct typefile);
@@ -396,8 +390,7 @@ decode_dir(struct tf_packet *p)
     }
 }
 
-void
-do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
+void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
 {
     time_t startTime = time(NULL);
     enum
@@ -539,8 +532,7 @@ do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
     finalStats(byteCount, startTime);
 }
 
-void
-do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
+void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
 {
     time_t startTime = time(NULL);
     enum
@@ -666,8 +658,7 @@ do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
     finalStats(byteCount, startTime);
 }
 
-void
-do_hdd_del(int fd, char *path)
+void do_hdd_del(int fd, char *path)
 {
     int r;
 
@@ -696,8 +687,7 @@ do_hdd_del(int fd, char *path)
     }
 }
 
-void
-do_hdd_rename(int fd, char *srcPath, char *dstPath)
+void do_hdd_rename(int fd, char *srcPath, char *dstPath)
 {
     int r;
 
@@ -726,8 +716,7 @@ do_hdd_rename(int fd, char *srcPath, char *dstPath)
     }
 }
 
-void
-do_hdd_mkdir(int fd, char *path)
+void do_hdd_mkdir(int fd, char *path)
 {
     int r;
 
@@ -756,8 +745,7 @@ do_hdd_mkdir(int fd, char *path)
     }
 }
 
-void
-progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
+void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
 {
     int delta = abs(difftime(startTime, time(NULL)));
 
@@ -775,8 +763,7 @@ progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
     }
 }
 
-void
-finalStats(__u64 bytes, time_t startTime)
+void finalStats(__u64 bytes, time_t startTime)
 {
     int delta = abs(difftime(startTime, time(NULL)));
 
@@ -791,8 +778,7 @@ finalStats(__u64 bytes, time_t startTime)
     fprintf(stderr, "\n");
 }
 
-void
-usage(char *myName)
+void usage(char *myName)
 {
     char *usageString =
         "Usage: %s [-pPtv] [-d <device>] -c <command> [args]\n"
@@ -808,8 +794,7 @@ usage(char *myName)
     fprintf(stderr, usageString, myName);
 }
 
-int
-parseArgs(int argc, char *argv[])
+int parseArgs(int argc, char *argv[])
 {
     extern char *optarg;
     extern int optind;
@@ -965,14 +950,12 @@ parseArgs(int argc, char *argv[])
     return 0;
 }
 
-int
-isToppy(struct usb_device_descriptor *desc)
+int isToppy(struct usb_device_descriptor *desc)
 {
     return (desc->idVendor == 0x11db) && (desc->idProduct == 0x1000);
 }
 
-char *
-findToppy(void)
+char *findToppy(void)
 {
     FILE *toppy;
     char buffer[MAX_DEVICES_LINE_SIZE];
