@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.20 2005/03/11 14:38:57 purbanec Exp $ */
+/* $Id: puppy.c,v 1.21 2005/05/01 18:38:14 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -27,6 +27,8 @@
 
 */
 
+#define PUPPY_RELEASE "1.9"
+
 #define _LARGEFILE64_SOURCE
 
 #include <errno.h>
@@ -46,7 +48,6 @@
 #include "usb_io.h"
 #include "tf_bytes.h"
 
-#define trace(level, msg) if(verbose >= level) { msg; }
 #define PUT 0
 #define GET 1
 
@@ -55,7 +56,6 @@
 extern time_t timezone;
 
 int lockFd = -1;
-int verbose = 0;
 int quiet = 0;
 char *devPath = NULL;
 int turbo_req = 0;
@@ -70,6 +70,7 @@ int parseArgs(int argc, char *argv[]);
 int isToppy(struct usb_device_descriptor *desc);
 char *findToppy(void);
 void do_cancel(int fd);
+int do_cmd_ready(int fd);
 void do_cmd_reset(int fd);
 void do_hdd_size(int fd);
 void do_hdd_dir(int fd, char *path);
@@ -90,6 +91,7 @@ void finalStats(__u64 bytes, time_t startTime);
 #define E_DEVICE_LOCK 6
 #define E_LOCK_FILE 7
 #define E_GLOBAL_LOCK 8
+#define E_RESET_DEVICE 9
 
 int main(int argc, char *argv[])
 {
@@ -99,7 +101,7 @@ int main(int argc, char *argv[])
 
     /* Initialise timezone handling. */
     tzset();
-
+    
     lockFd = open("/tmp/puppy", O_CREAT, S_IRUSR | S_IWUSR);
     if(lockFd < 0)
     {
@@ -122,7 +124,7 @@ int main(int argc, char *argv[])
         return E_GLOBAL_LOCK;
     }
 
-    trace(1, fprintf(stderr, "cmd %04x on %s\n", cmd, devPath));
+    trace(2, fprintf(stderr, "cmd %04x on %s\n", cmd, devPath));
 
     fd = open(devPath, O_RDWR);
     if(fd < 0)
@@ -155,9 +157,20 @@ int main(int argc, char *argv[])
 
     trace(1, fprintf(stderr, "Found a Topfield TF5000PVRt\n"));
 
+    trace(2, fprintf(stderr, "USBDEVFS_RESET\n"));
+    r = ioctl(fd, USBDEVFS_RESET, NULL);
+    if(r < 0)
+    {
+        fprintf(stderr, "ERROR: Can not reset device: %s\n",
+                strerror(errno));
+        close(fd);
+        return E_RESET_DEVICE;
+    }
+
     {
         int interface = 0;
 
+        trace(2, fprintf(stderr, "USBDEVFS_CLAIMINTERFACE\n"));
         r = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &interface);
         if(r < 0)
         {
@@ -171,6 +184,7 @@ int main(int argc, char *argv[])
     {
       struct usbdevfs_setinterface interface0 = {0, 0};
 
+      trace(2, fprintf(stderr, "USBDEVFS_SETNTERFACE\n"));
       r = ioctl(fd, USBDEVFS_SETINTERFACE, &interface0);
       if(r < 0)
 	{
@@ -181,6 +195,13 @@ int main(int argc, char *argv[])
 	}
     }
 
+    trace(2, fprintf(stderr, "pre-emptive cancel loop\n"));
+    for(int k = 0; k < 3; k++)
+    {
+        send_cancel(fd);
+        get_tf_packet(fd, &reply);
+    }
+    
     switch (cmd)
     {
         case CANCEL:
@@ -296,6 +317,41 @@ void do_cmd_reset(int fd)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+}
+
+int do_cmd_ready(int fd)
+{
+    int r;
+
+    r = send_cmd_ready(fd);
+    if(r < 0)
+    {
+        return errno;
+    }
+
+    r = get_tf_packet(fd, &reply);
+    if(r < 0)
+    {
+        return errno;
+    }
+
+    switch (get_u32(&reply.cmd))
+    {
+        case SUCCESS:
+            printf("Device reports ready.\n");
+            return 0;
+            break;
+
+        case FAIL:
+            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            get_u32(&reply.data);
+            break;
+
+        default:
+            fprintf(stderr, "ERROR: Unhandled packet\n");
+            return -1;
+    }
+    return -1;
 }
 
 void do_cancel(int fd)
@@ -583,7 +639,6 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
         }
     }
     close(src);
-    fprintf(stderr, "\n");
     switch_turbo(fd, 0);
     finalStats(byteCount, startTime);
 }
@@ -708,7 +763,6 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
         }
     }
     close(dst);
-    fprintf(stderr, "\n");
     utime(dstPath, &mod_utime_buf);
     switch_turbo(fd, 0);
     finalStats(byteCount, startTime);
@@ -803,7 +857,9 @@ void do_hdd_mkdir(int fd, char *path)
 
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
 {
-    int delta = abs(difftime(startTime, time(NULL)));
+    int delta = time(NULL) - startTime;
+
+    if(quiet) return;
 
     if(delta > 0)
     {
@@ -821,17 +877,17 @@ void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
 
 void finalStats(__u64 bytes, time_t startTime)
 {
-    int delta = abs(difftime(startTime, time(NULL)));
+    int delta = time(NULL) - startTime;
 
-    fprintf(stderr, "%.2f Mbytes in %02d:%02d:%02d",
-            (double) bytes / (1000.0 * 1000.0),
-            delta / (60 * 60), (delta / 60) % 60, delta % 60);
+    if(quiet) return;
+
     if(delta > 0)
     {
-        fprintf(stderr, " (%.2f Mbits/s)",
+        fprintf(stderr, "\n%.2f Mbytes in %02d:%02d:%02d (%.2f Mbits/s)\n",
+                (double) bytes / (1000.0 * 1000.0),
+                delta / (60 * 60), (delta / 60) % 60, delta % 60,
                 ((bytes * 8.0) / delta) / (1000.0 * 1000.0));
     }
-    fprintf(stderr, "\n");
 }
 
 void usage(char *myName)
@@ -846,7 +902,8 @@ void usage(char *myName)
         " -d <device>    - USB device (must be usbfs)\n"
         "                  for example /proc/bus/usb/001/003\n"
         " -c <command>   - one of size, dir, get, put, rename, delete, mkdir, reboot, cancel\n"
-        " args           - optional arguments, as required by each command\n";
+        " args           - optional arguments, as required by each command\n\n"
+        "Version: " PUPPY_RELEASE ", Compiled: " __DATE__ "\n";
     fprintf(stderr, usageString, myName);
 }
 
@@ -861,7 +918,7 @@ int parseArgs(int argc, char *argv[])
         switch (c)
         {
             case 'v':
-                verbose = 1;
+                verbose++;
                 break;
 
             case 'p':
@@ -1046,7 +1103,7 @@ char *findToppy(void)
            (buffer, "T: Bus=%d Lev=%*d Prnt=%*d Port=%*d Cnt=%*d Dev#=%d",
             &bus, &device))
         {
-            trace(1,
+            trace(2,
                   fprintf(stderr, "Found USB device at bus=%d, device=%d\n",
                           bus, device));
         }
