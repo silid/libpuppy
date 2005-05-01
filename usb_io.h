@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.h,v 1.12 2005/03/11 14:37:16 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.13 2005/05/01 18:32:50 purbanec Exp $ */
 
 /*
 
@@ -70,6 +70,11 @@
 /* Number of milliseconds to wait for a packet transfer to complete. */
 #define TF_PROTOCOL_TIMEOUT 1100
 
+
+#define trace(level, msg) if(verbose >= level) { msg; }
+
+extern int verbose;
+
 /* 0 - disable tracing
    1 - show packet headers
    2+ - dump entire packet
@@ -82,7 +87,8 @@ extern int packet_trace;
    packets contain an even number of bytes that is smaller than this
    value.
 */
-#define MAXIMUM_PACKET_SIZE 0xFFFFL
+#define MAXIMUM_READ_PACKET_SIZE 0xFFFFL
+#define MAXIMUM_WRITE_PACKET_SIZE 0xFFFFL
 
 /* The size of every packet header. */
 #define PACKET_HEAD_SIZE 8
@@ -93,7 +99,7 @@ struct tf_packet
     __u16 length;
     __u16 crc;
     __u32 cmd;
-    __u8 data[MAXIMUM_PACKET_SIZE - PACKET_HEAD_SIZE];
+    __u8 data[MAXIMUM_READ_PACKET_SIZE - PACKET_HEAD_SIZE];
 } __attribute__ ((packed));
 
 /* Topfield file descriptor data structure. */
@@ -110,6 +116,7 @@ struct typefile
 
 ssize_t send_success(int fd);
 ssize_t send_cancel(int fd);
+ssize_t send_cmd_ready(int fd);
 ssize_t send_cmd_reset(int fd);
 ssize_t send_cmd_turbo(int fd, int turbo_on);
 ssize_t send_cmd_hdd_size(int fd);

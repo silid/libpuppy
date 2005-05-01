@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.c,v 1.13 2005/01/18 14:00:47 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.14 2005/05/01 18:32:50 purbanec Exp $ */
 
 /*
 
@@ -53,6 +53,7 @@
 
 /* 2+ - dump entire packet */
 int packet_trace = 0;
+int verbose = 0;
 
 void byte_swap(struct tf_packet *packet)
 {
@@ -69,28 +70,47 @@ void byte_swap(struct tf_packet *packet)
     }
 }
 
+static __u8 cancel_packet[8] =
+{
+    0x08, 0x00, 0x40, 0x01, 0x00, 0x00, 0x03, 0x00
+};
+
+static __u8 success_packet[8] =
+{
+    0x08, 0x00, 0x81, 0xc1, 0x00, 0x00, 0x02, 0x00
+};
+
+/* Optimised packet handling to reduce overhead during bulk file transfers. */
 ssize_t send_cancel(int fd)
+{
+    trace(2, fprintf(stderr, "send_cancel\n"));
+
+    return usb_bulk_write(fd, 0x01, cancel_packet, 8, TF_PROTOCOL_TIMEOUT);
+}
+
+ssize_t send_success(int fd)
+{
+    trace(2, fprintf(stderr, "send_success\n"));
+    
+    return usb_bulk_write(fd, 0x01, success_packet, 8, TF_PROTOCOL_TIMEOUT);
+}
+
+ssize_t send_cmd_ready(int fd)
 {
     struct tf_packet req;
 
+    trace(2, fprintf(stderr, "send_cmd_ready\n"));
+
     put_u16(&req.length, 8);
-    put_u32(&req.cmd, CANCEL);
+    put_u32(&req.cmd, CMD_READY);
     return send_tf_packet(fd, &req);
-}
-
-/* Optimised packet handling to reduce overhead during bulk file transfers. */
-ssize_t send_success(int fd)
-{
-    static __u8 success_packet[8] = {
-        0x08, 0x00, 0x81, 0xc1, 0x00, 0x00, 0x02, 0x00
-    };
-
-    return usb_bulk_write(fd, 0x01, success_packet, 8, TF_PROTOCOL_TIMEOUT);
 }
 
 ssize_t send_cmd_reset(int fd)
 {
     struct tf_packet req;
+
+    trace(2, fprintf(stderr, "send_cmd_reset\n"));
 
     put_u16(&req.length, 8);
     put_u32(&req.cmd, CMD_RESET);
@@ -100,6 +120,8 @@ ssize_t send_cmd_reset(int fd)
 ssize_t send_cmd_turbo(int fd, int turbo_on)
 {
     struct tf_packet req;
+
+    trace(2, fprintf(stderr, "send_cmd_turbo\n"));
 
     put_u16(&req.length, 12);
     put_u32(&req.cmd, CMD_TURBO);
@@ -111,6 +133,8 @@ ssize_t send_cmd_hdd_size(int fd)
 {
     struct tf_packet req;
 
+    trace(2, fprintf(stderr, "send_cmd_hdd_size\n"));
+
     put_u16(&req.length, 8);
     put_u32(&req.cmd, CMD_HDD_SIZE);
     return send_tf_packet(fd, &req);
@@ -118,6 +142,8 @@ ssize_t send_cmd_hdd_size(int fd)
 
 __u16 get_crc(struct tf_packet * packet)
 {
+    trace(3, fprintf(stderr, "get_crc\n"));
+
     return crc16_ansi(&(packet->cmd), get_u16(&packet->length) - 4);
 }
 
@@ -127,7 +153,9 @@ ssize_t send_cmd_hdd_dir(int fd, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
+    trace(2, fprintf(stderr, "send_cmd_hdd_dir\n"));
+
+    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -147,7 +175,9 @@ int send_cmd_hdd_file_send(int fd, __u8 dir, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    if((PACKET_HEAD_SIZE + 1 + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
+    trace(2, fprintf(stderr, "send_cmd_hdd_file_send\n"));
+
+    if((PACKET_HEAD_SIZE + 1 + 2 + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -169,7 +199,9 @@ ssize_t send_cmd_hdd_del(int fd, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
+    trace(2, fprintf(stderr, "send_cmd_hdd_del\n"));
+
+    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -190,7 +222,9 @@ ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst)
     __u16 srcLen = strlen(src) + 1;
     __u16 dstLen = strlen(dst) + 1;
 
-    if((PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen) >= MAXIMUM_PACKET_SIZE)
+    trace(2, fprintf(stderr, "send_cmd_hdd_rename\n"));
+
+    if((PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen) >= MAXIMUM_WRITE_PACKET_SIZE)
     {
         fprintf(stderr,
                 "ERROR: Combination of source and destination paths is too long.\n");
@@ -214,7 +248,9 @@ ssize_t send_cmd_hdd_create_dir(int fd, char *path)
     __u16 packetSize;
     __u16 pathLen = strlen(path) + 1;
 
-    if((PACKET_HEAD_SIZE + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
+    trace(2, fprintf(stderr, "send_cmd_hdd_create_dir\n"));
+
+    if((PACKET_HEAD_SIZE + 2 + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -281,6 +317,8 @@ ssize_t send_tf_packet(int fd, struct tf_packet *packet)
 {
     __u16 pl = get_u16(&packet->length);
 
+    trace(3, fprintf(stderr, "send_tf_packet\n"));
+
     if(pl % 2)
     {
         /* Have to send an extra byte to preserve the byteswapped odd byte */
@@ -300,7 +338,9 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
     __u8 *buf = (__u8 *) packet;
     int r;
 
-    r = usb_bulk_read(fd, 0x82, buf, MAXIMUM_PACKET_SIZE,
+    trace(3, fprintf(stderr, "get_tf_packet\n"));
+
+    r = usb_bulk_read(fd, 0x82, buf, MAXIMUM_READ_PACKET_SIZE,
                       TF_PROTOCOL_TIMEOUT);
     if(r < PACKET_HEAD_SIZE)
     {
@@ -315,7 +355,6 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
     }
 
     byte_swap(packet);
-    return r;
 
     {
         __u16 crc;
@@ -346,7 +385,9 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 /* Linux usbdevfs has a limit of one page size per read/write.
    4096 is the most portable maximum we can do for now.
 */
-#define MAX_READ_WRITE	4096
+/* #define MAX_READ	4096 */
+#define MAX_READ	4096
+#define MAX_WRITE	4096
 
 /* This function is adapted from libusb */
 ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
@@ -356,6 +397,9 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
     ssize_t ret;
     ssize_t sent = 0;
 
+    trace(3, fprintf(stderr, "usb_bulk_write: sending %d bytes, timeout %d\n",
+                     length, timeout));
+
     /* Ensure the endpoint direction is correct */
     ep &= ~USB_ENDPOINT_DIR_MASK;
 
@@ -363,12 +407,18 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
     {
         bulk.ep = ep;
         bulk.len = length - sent;
-        if(bulk.len > MAX_READ_WRITE)
+        if(bulk.len > MAX_WRITE)
         {
-            bulk.len = MAX_READ_WRITE;
+            bulk.len = MAX_WRITE;
         }
         bulk.timeout = timeout;
         bulk.data = (__u8 *) bytes + sent;
+
+        trace(4, fprintf(stderr, "usb_bulk_write:ioctl - send %d bytes\n", bulk.len));
+        
+        trace(5, fprintf(stderr,
+                "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
+                bulk.ep, bulk.len, bulk.timeout, bulk.data));
 
         ret = ioctl(fd, USBDEVFS_BULK, &bulk);
         if(ret < 0)
@@ -377,8 +427,11 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
                     ep, strerror(errno));
         }
         sent += ret;
+        trace(4, fprintf(stderr, "usb_bulk_write:ioctl - sent %d bytes\n", ret));
     }
     while((ret > 0) && (sent < length));
+
+    trace(3, fprintf(stderr, "usb_bulk_write: sent %d bytes\n", sent));
 
     return sent;
 }
@@ -391,6 +444,9 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
     ssize_t retrieved = 0;
     ssize_t requested;
 
+    trace(3, fprintf(stderr, "usb_bulk_read: requesting %d bytes, timeout %d\n",
+                     size, timeout));
+
     /* Ensure the endpoint address is correct */
     ep |= USB_ENDPOINT_DIR_MASK;
 
@@ -398,13 +454,19 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
     {
         bulk.ep = ep;
         requested = size - retrieved;
-        if(requested > MAX_READ_WRITE)
+        if(requested > MAX_READ)
         {
-            requested = MAX_READ_WRITE;
+            requested = MAX_READ;
         }
         bulk.len = requested;
         bulk.timeout = timeout;
         bulk.data = (unsigned char *) bytes + retrieved;
+
+        trace(4, fprintf(stderr, "usb_bulk_read:ioctl - request %d bytes\n", bulk.len));
+        trace(5, fprintf(stderr,
+                "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
+                bulk.ep, bulk.len, bulk.timeout, bulk.data));
+
 
         ret = ioctl(fd, USBDEVFS_BULK, &bulk);
         if(ret < 0)
@@ -412,11 +474,12 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
             fprintf(stderr, "error %d reading from bulk endpoint 0x%x: %s\n",
                     errno, ep, strerror(errno));
         }
-
         retrieved += ret;
+        trace(4, fprintf(stderr, "usb_bulk_read:ioctl - received %d bytes\n", ret));
     }
     while((ret > 0) && (retrieved < size) && (ret == requested));
 
+    trace(3, fprintf(stderr, "usb_bulk_read: returning %d bytes\n", retrieved));
     return retrieved;
 }
 
