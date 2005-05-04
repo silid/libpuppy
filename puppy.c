@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.21 2005/05/01 18:38:14 purbanec Exp $ */
+/* $Id: puppy.c,v 1.22 2005/05/04 03:21:30 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -27,7 +27,7 @@
 
 */
 
-#define PUPPY_RELEASE "1.9"
+#define PUPPY_RELEASE "1.10"
 
 #define _LARGEFILE64_SOURCE
 
@@ -69,17 +69,17 @@ struct tf_packet reply;
 int parseArgs(int argc, char *argv[]);
 int isToppy(struct usb_device_descriptor *desc);
 char *findToppy(void);
-void do_cancel(int fd);
+int do_cancel(int fd);
 int do_cmd_ready(int fd);
-void do_cmd_reset(int fd);
-void do_hdd_size(int fd);
-void do_hdd_dir(int fd, char *path);
-void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on);
-void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on);
+int do_cmd_reset(int fd);
+int do_hdd_size(int fd);
+int do_hdd_dir(int fd, char *path);
+int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on);
+int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on);
 void decode_dir(struct tf_packet *p);
-void do_hdd_del(int fd, char *path);
-void do_hdd_rename(int fd, char *srcPath, char *dstPath);
-void do_hdd_mkdir(int fd, char *path);
+int do_hdd_del(int fd, char *path);
+int do_hdd_rename(int fd, char *srcPath, char *dstPath);
+int do_hdd_mkdir(int fd, char *path);
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
 void finalStats(__u64 bytes, time_t startTime);
 
@@ -205,46 +205,47 @@ int main(int argc, char *argv[])
     switch (cmd)
     {
         case CANCEL:
-            do_cancel(fd);
+            r = do_cancel(fd);
             break;
 
         case CMD_RESET:
-            do_cmd_reset(fd);
+            r = do_cmd_reset(fd);
             break;
 
         case CMD_HDD_SIZE:
-            do_hdd_size(fd);
+            r = do_hdd_size(fd);
             break;
 
         case CMD_HDD_DIR:
-            do_hdd_dir(fd, arg1);
+            r = do_hdd_dir(fd, arg1);
             break;
 
         case CMD_HDD_FILE_SEND:
             if(sendDirection == PUT)
             {
-                do_hdd_file_put(fd, arg1, arg2, turbo_req);
+                r = do_hdd_file_put(fd, arg1, arg2, turbo_req);
             }
             else
             {
-                do_hdd_file_get(fd, arg1, arg2, turbo_req);
+                r = do_hdd_file_get(fd, arg1, arg2, turbo_req);
             }
             break;
 
         case CMD_HDD_DEL:
-            do_hdd_del(fd, arg1);
+            r = do_hdd_del(fd, arg1);
             break;
 
         case CMD_HDD_RENAME:
-            do_hdd_rename(fd, arg1, arg2);
+            r = do_hdd_rename(fd, arg1, arg2);
             break;
 
         case CMD_HDD_CREATE_DIR:
-            do_hdd_mkdir(fd, arg1);
+            r = do_hdd_mkdir(fd, arg1);
             break;
 
         default:
             fprintf(stderr, "BUG: Command 0x%08x not implemented\n", cmd);
+            r = -EINVAL;
     }
 
     {
@@ -252,23 +253,23 @@ int main(int argc, char *argv[])
         ioctl(fd, USBDEVFS_RELEASEINTERFACE, &interface);
 	close(fd);
     }
-    return 0;
+    return r;
 }
 
-void switch_turbo(int fd, int turbo_on)
+int switch_turbo(int fd, int turbo_on)
 {
     int r;
 
     r = send_cmd_turbo(fd, turbo_on);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     switch (get_u32(&reply.cmd))
@@ -277,6 +278,7 @@ void switch_turbo(int fd, int turbo_on)
             trace(1,
                   fprintf(stderr, "Turbo mode: %s\n",
                           turbo_on ? "On" : "Off"));
+            return 0;
             break;
 
         case FAIL:
@@ -286,28 +288,30 @@ void switch_turbo(int fd, int turbo_on)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
-void do_cmd_reset(int fd)
+int do_cmd_reset(int fd)
 {
     int r;
 
     r = send_cmd_reset(fd);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     switch (get_u32(&reply.cmd))
     {
         case SUCCESS:
             printf("TF5000PVRt should now reboot\n");
+            return 0;
             break;
 
         case FAIL:
@@ -317,6 +321,7 @@ void do_cmd_reset(int fd)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
 int do_cmd_ready(int fd)
@@ -326,13 +331,13 @@ int do_cmd_ready(int fd)
     r = send_cmd_ready(fd);
     if(r < 0)
     {
-        return errno;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return errno;
+        return -EPROTO;
     }
 
     switch (get_u32(&reply.cmd))
@@ -351,29 +356,30 @@ int do_cmd_ready(int fd)
             fprintf(stderr, "ERROR: Unhandled packet\n");
             return -1;
     }
-    return -1;
+    return -EPROTO;
 }
 
-void do_cancel(int fd)
+int do_cancel(int fd)
 {
     int r;
 
     r = send_cancel(fd);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     switch (get_u32(&reply.cmd))
     {
         case SUCCESS:
             printf("In progress operation cancelled\n");
+            return 0;
             break;
 
         case FAIL:
@@ -383,22 +389,23 @@ void do_cancel(int fd)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
-void do_hdd_size(int fd)
+int do_hdd_size(int fd)
 {
     int r;
 
     r = send_cmd_hdd_size(fd);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     switch (get_u32(&reply.cmd))
@@ -412,6 +419,7 @@ void do_hdd_size(int fd)
                    totalk / (1024 * 1024));
             printf("Free  %10u kiB %7u MiB %4u GiB\n", freek, freek / 1024,
                    freek / (1024 * 1024));
+            return 0;
             break;
         }
 
@@ -422,20 +430,20 @@ void do_hdd_size(int fd)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
-void do_hdd_dir(int fd, char *path)
+int do_hdd_dir(int fd, char *path)
 {
-    char getAnotherPacket = 1;
     int r;
 
     r = send_cmd_hdd_dir(fd, path);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
-    while(getAnotherPacket && (0 < get_tf_packet(fd, &reply)))
+    while(0 < get_tf_packet(fd, &reply))
     {
         switch (get_u32(&reply.cmd))
         {
@@ -445,18 +453,20 @@ void do_hdd_dir(int fd, char *path)
                 break;
 
             case DATA_HDD_DIR_END:
-                getAnotherPacket = 0;
+                return 0;
                 break;
 
             case FAIL:
                 fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
-                getAnotherPacket = 0;
+                return -EPROTO;
                 break;
 
             default:
                 fprintf(stderr, "ERROR: Unhandled packet\n");
+                return -EPROTO;
         }
     }
+    return -EPROTO;
 }
 
 void decode_dir(struct tf_packet *p)
@@ -494,16 +504,16 @@ void decode_dir(struct tf_packet *p)
     }
 }
 
-void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
+int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
 {
+    int result = -EPROTO;
     time_t startTime = time(NULL);
     enum
     {
         START,
         DATA,
         END,
-        FINISHED,
-        EXIT
+        FINISHED
     } state;
     int src = -1;
     int r;
@@ -515,21 +525,21 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
     if(src < 0)
     {
         fprintf(stderr, "ERROR: Can not open source file: %s\n", strerror(errno));
-        return;
+        return errno;
     }
 
     if(0 != fstat64(src, &srcStat))
     {
         fprintf(stderr, "ERROR: Can not examine source file: %s\n", strerror(errno));
-        close(src);
-        return;
+        result = errno;
+        goto out;
     }
     
     if(srcStat.st_size == 0)
     {
         fprintf(stderr, "ERROR: Source file is empty - not transfering.\n");
-        close(src);
-        return;
+        result = -ENODATA;
+        goto out;
     }
 
     switch_turbo(fd, turbo_on);
@@ -537,11 +547,11 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
     r = send_cmd_hdd_file_send(fd, PUT, dstPath);
     if(r < 0)
     {
-        return;
+        goto out;
     }
 
     state = START;
-    while((state != EXIT) && (0 < get_tf_packet(fd, &reply)))
+    while(0 < get_tf_packet(fd, &reply))
     {
         update = (update + 1) % 16;
         switch (get_u32(&reply.cmd))
@@ -566,7 +576,8 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                         r = send_tf_packet(fd, &packet);
                         if(r < 0)
                         {
-                            return;
+                            fprintf(stderr, "ERROR: Incomplete send.\n");
+                            goto out;
                         }
                         state = DATA;
                         break;
@@ -594,7 +605,7 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                             if(r < w)
                             {
                                 fprintf(stderr, "ERROR: Incomplete send.\n");
-                                return;
+                                goto out;
                             }
                         }
 
@@ -613,24 +624,22 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                         r = send_tf_packet(fd, &packet);
                         if(r < 0)
                         {
-                            return;
+                            fprintf(stderr, "ERROR: Incomplete send.\n");
+                            goto out;
                         }
                         state = FINISHED;
                         break;
 
                     case FINISHED:
-                        state = EXIT;
-                        break;
-
-                    case EXIT:
-                        /* Should not get here. */
+                        result = 0;
+                        goto out;
                         break;
                 }
                 break;
 
             case FAIL:
                 fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
-                state = EXIT;
+                goto out;
                 break;
 
             default:
@@ -638,20 +647,23 @@ void do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
         }
     }
+    finalStats(byteCount, startTime);
+    
+out:
     close(src);
     switch_turbo(fd, 0);
-    finalStats(byteCount, startTime);
+    return result;
 }
 
-void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
+int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
 {
+    int result = -EPROTO;
     time_t startTime = time(NULL);
     enum
     {
         START,
         DATA,
-        ABORT,
-        EXIT
+        ABORT
     } state;
     int dst = -1;
     int r;
@@ -665,18 +677,18 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
     {
         fprintf(stderr, "ERROR: Can not open destination file: %s\n",
                 strerror(errno));
-        return;
+        return errno;
     }
 
     switch_turbo(fd, turbo_on);
     r = send_cmd_hdd_file_send(fd, GET, srcPath);
     if(r < 0)
     {
-        return;
+        goto out;
     }
 
     state = START;
-    while((state != EXIT) && (0 < (r = get_tf_packet(fd, &reply))))
+    while(0 < (r = get_tf_packet(fd, &reply)))
     {
         update = (update + 1) % 16;
         switch (get_u32(&reply.cmd))
@@ -745,7 +757,8 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
 
             case DATA_HDD_FILE_END:
                 send_success(fd);
-                state = EXIT;
+                result = 0;
+                goto out;
                 break;
 
             case FAIL:
@@ -755,37 +768,41 @@ void do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             case SUCCESS:
-                state = EXIT;
+                goto out;
                 break;
 
             default:
-                fprintf(stderr, "ERROR: Unhandled packet\n");
+                fprintf(stderr, "ERROR: Unhandled packet (cmd 0x%x)\n", get_u32(&reply.cmd));
         }
     }
-    close(dst);
     utime(dstPath, &mod_utime_buf);
-    switch_turbo(fd, 0);
     finalStats(byteCount, startTime);
+    
+out:
+    close(dst);
+    switch_turbo(fd, 0);
+    return result;
 }
 
-void do_hdd_del(int fd, char *path)
+int do_hdd_del(int fd, char *path)
 {
     int r;
 
     r = send_cmd_hdd_del(fd, path);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
     switch (get_u32(&reply.cmd))
     {
         case SUCCESS:
+            return 0;
             break;
 
         case FAIL:
@@ -795,26 +812,28 @@ void do_hdd_del(int fd, char *path)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
-void do_hdd_rename(int fd, char *srcPath, char *dstPath)
+int do_hdd_rename(int fd, char *srcPath, char *dstPath)
 {
     int r;
 
     r = send_cmd_hdd_rename(fd, srcPath, dstPath);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
     switch (get_u32(&reply.cmd))
     {
         case SUCCESS:
+            return 0;
             break;
 
         case FAIL:
@@ -824,26 +843,28 @@ void do_hdd_rename(int fd, char *srcPath, char *dstPath)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
-void do_hdd_mkdir(int fd, char *path)
+int do_hdd_mkdir(int fd, char *path)
 {
     int r;
 
     r = send_cmd_hdd_create_dir(fd, path);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
 
     r = get_tf_packet(fd, &reply);
     if(r < 0)
     {
-        return;
+        return -EPROTO;
     }
     switch (get_u32(&reply.cmd))
     {
         case SUCCESS:
+            return 0;
             break;
 
         case FAIL:
@@ -853,6 +874,7 @@ void do_hdd_mkdir(int fd, char *path)
         default:
             fprintf(stderr, "ERROR: Unhandled packet\n");
     }
+    return -EPROTO;
 }
 
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
