@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.c,v 1.14 2005/05/01 18:32:50 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.15 2005/08/26 16:25:33 purbanec Exp $ */
 
 /*
 
@@ -23,6 +23,7 @@
 
 */
 
+#include <assert.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -32,13 +33,12 @@
 #include <unistd.h>
 #include <asm/byteorder.h>
 #include "usb_io.h"
+#include "tf_bytes.h"
 #include "crc16.h"
 
 /* The Topfield packet handling is a bit unusual. All data is stored in
  * memory in big endian order, however, just prior to transmission all
  * data is byte swapped.
- *
- * All packets must be an even number of bytes in length.
  *
  * Functions to read and write the memory version of packets are provided
  * in tf_bytes.c
@@ -55,13 +55,14 @@
 int packet_trace = 0;
 int verbose = 0;
 
-void byte_swap(struct tf_packet *packet)
+/* Swap the odd and even bytes in the buffer, up to count bytes.
+ * If count is odd, the last byte remains unafected.
+ */
+void byte_swap(__u8 * d, int count)
 {
     int i;
-    __u8 *d = (__u8 *) packet;
-    int count = sizeof(struct tf_packet);
 
-    for(i = 0; i < count; i += 2)
+    for(i = 0; i < (count & ~1); i += 2)
     {
         __u8 t = d[i];
 
@@ -70,28 +71,47 @@ void byte_swap(struct tf_packet *packet)
     }
 }
 
-static __u8 cancel_packet[8] =
+/* Byte swap an incoming packet. */
+void swap_in_packet(struct tf_packet *packet)
 {
+    int size = (get_u16_raw(packet) + 1) & ~1;
+
+    if(size > MAXIMUM_PACKET_SIZE)
+    {
+        size = MAXIMUM_PACKET_SIZE;
+    };
+
+    byte_swap((__u8 *) packet, size);
+}
+
+/* Byte swap an outgoing packet. */
+void swap_out_packet(struct tf_packet *packet)
+{
+    int size = (get_u16(packet) + 1) & ~1;
+
+    byte_swap((__u8 *) packet, size);
+}
+
+static __u8 cancel_packet[8] = {
     0x08, 0x00, 0x40, 0x01, 0x00, 0x00, 0x03, 0x00
 };
 
-static __u8 success_packet[8] =
-{
+static __u8 success_packet[8] = {
     0x08, 0x00, 0x81, 0xc1, 0x00, 0x00, 0x02, 0x00
 };
 
 /* Optimised packet handling to reduce overhead during bulk file transfers. */
 ssize_t send_cancel(int fd)
 {
-    trace(2, fprintf(stderr, "send_cancel\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
     return usb_bulk_write(fd, 0x01, cancel_packet, 8, TF_PROTOCOL_TIMEOUT);
 }
 
 ssize_t send_success(int fd)
 {
-    trace(2, fprintf(stderr, "send_success\n"));
-    
+    trace(2, fprintf(stderr, "%s\n", __func__));
+
     return usb_bulk_write(fd, 0x01, success_packet, 8, TF_PROTOCOL_TIMEOUT);
 }
 
@@ -99,7 +119,7 @@ ssize_t send_cmd_ready(int fd)
 {
     struct tf_packet req;
 
-    trace(2, fprintf(stderr, "send_cmd_ready\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
     put_u16(&req.length, 8);
     put_u32(&req.cmd, CMD_READY);
@@ -110,7 +130,7 @@ ssize_t send_cmd_reset(int fd)
 {
     struct tf_packet req;
 
-    trace(2, fprintf(stderr, "send_cmd_reset\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
     put_u16(&req.length, 8);
     put_u32(&req.cmd, CMD_RESET);
@@ -121,7 +141,7 @@ ssize_t send_cmd_turbo(int fd, int turbo_on)
 {
     struct tf_packet req;
 
-    trace(2, fprintf(stderr, "send_cmd_turbo\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
     put_u16(&req.length, 12);
     put_u32(&req.cmd, CMD_TURBO);
@@ -133,7 +153,7 @@ ssize_t send_cmd_hdd_size(int fd)
 {
     struct tf_packet req;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_size\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
     put_u16(&req.length, 8);
     put_u32(&req.cmd, CMD_HDD_SIZE);
@@ -142,8 +162,6 @@ ssize_t send_cmd_hdd_size(int fd)
 
 __u16 get_crc(struct tf_packet * packet)
 {
-    trace(3, fprintf(stderr, "get_crc\n"));
-
     return crc16_ansi(&(packet->cmd), get_u16(&packet->length) - 4);
 }
 
@@ -153,9 +171,9 @@ ssize_t send_cmd_hdd_dir(int fd, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_dir\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
-    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
+    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -175,9 +193,9 @@ int send_cmd_hdd_file_send(int fd, __u8 dir, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_file_send\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
-    if((PACKET_HEAD_SIZE + 1 + 2 + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
+    if((PACKET_HEAD_SIZE + 1 + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -199,9 +217,9 @@ ssize_t send_cmd_hdd_del(int fd, char *path)
     __u16 packetSize;
     int pathLen = strlen(path) + 1;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_del\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
-    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
+    if((PACKET_HEAD_SIZE + pathLen) >= MAXIMUM_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -222,9 +240,9 @@ ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst)
     __u16 srcLen = strlen(src) + 1;
     __u16 dstLen = strlen(dst) + 1;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_rename\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
-    if((PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen) >= MAXIMUM_WRITE_PACKET_SIZE)
+    if((PACKET_HEAD_SIZE + 2 + srcLen + 2 + dstLen) >= MAXIMUM_PACKET_SIZE)
     {
         fprintf(stderr,
                 "ERROR: Combination of source and destination paths is too long.\n");
@@ -248,9 +266,9 @@ ssize_t send_cmd_hdd_create_dir(int fd, char *path)
     __u16 packetSize;
     __u16 pathLen = strlen(path) + 1;
 
-    trace(2, fprintf(stderr, "send_cmd_hdd_create_dir\n"));
+    trace(2, fprintf(stderr, "%s\n", __func__));
 
-    if((PACKET_HEAD_SIZE + 2 + pathLen) >= MAXIMUM_WRITE_PACKET_SIZE)
+    if((PACKET_HEAD_SIZE + 2 + pathLen) >= MAXIMUM_PACKET_SIZE)
     {
         fprintf(stderr, "ERROR: Path is too long.\n");
         return -1;
@@ -315,19 +333,15 @@ void print_packet(struct tf_packet *packet, char *prefix)
  * CRC and send the packet out over a bulk pipe. */
 ssize_t send_tf_packet(int fd, struct tf_packet *packet)
 {
-    __u16 pl = get_u16(&packet->length);
+    unsigned int pl = get_u16(&packet->length);
+    ssize_t byte_count = (pl + 1) & ~1;
 
-    trace(3, fprintf(stderr, "send_tf_packet\n"));
-
-    if(pl % 2)
-    {
-        /* Have to send an extra byte to preserve the byteswapped odd byte */
-        pl++;
-    }
+    trace(3, fprintf(stderr, "%s\n", __func__));
     put_u16(&packet->crc, get_crc(packet));
     print_packet(packet, "OUT>");
-    byte_swap(packet);
-    return usb_bulk_write(fd, 0x01, (__u8 *) packet, pl, TF_PROTOCOL_TIMEOUT);
+    swap_out_packet(packet);
+    return usb_bulk_write(fd, 0x01, (__u8 *) packet, byte_count,
+                          TF_PROTOCOL_TIMEOUT);
 }
 
 /* Receive a Topfield protocol packet.
@@ -340,8 +354,14 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 
     trace(3, fprintf(stderr, "get_tf_packet\n"));
 
-    r = usb_bulk_read(fd, 0x82, buf, MAXIMUM_READ_PACKET_SIZE,
+    r = usb_bulk_read(fd, 0x82, buf, MAXIMUM_PACKET_SIZE,
                       TF_PROTOCOL_TIMEOUT);
+    if(r < 0)
+    {
+        fprintf(stderr, "USB read error: %s\n", strerror(errno));
+        return -1;
+    }
+
     if(r < PACKET_HEAD_SIZE)
     {
         fprintf(stderr, "Short read. %d bytes\n", r);
@@ -354,7 +374,7 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
         send_success(fd);
     }
 
-    byte_swap(packet);
+    swap_in_packet(packet);
 
     {
         __u16 crc;
@@ -385,7 +405,7 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 /* Linux usbdevfs has a limit of one page size per read/write.
    4096 is the most portable maximum we can do for now.
 */
-/* #define MAX_READ	4096 */
+
 #define MAX_READ	4096
 #define MAX_WRITE	4096
 
@@ -397,7 +417,7 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
     ssize_t ret;
     ssize_t sent = 0;
 
-    trace(3, fprintf(stderr, "usb_bulk_write: sending %d bytes, timeout %d\n",
+    trace(3, fprintf(stderr, "%s: sending %d bytes, timeout %d\n", __func__,
                      length, timeout));
 
     /* Ensure the endpoint direction is correct */
@@ -411,14 +431,17 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
         {
             bulk.len = MAX_WRITE;
         }
+
         bulk.timeout = timeout;
         bulk.data = (__u8 *) bytes + sent;
 
-        trace(4, fprintf(stderr, "usb_bulk_write:ioctl - send %d bytes\n", bulk.len));
-        
+        trace(4,
+              fprintf(stderr, "%s: ioctl - send %d bytes\n", __func__,
+                      bulk.len));
+
         trace(5, fprintf(stderr,
-                "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
-                bulk.ep, bulk.len, bulk.timeout, bulk.data));
+                         "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
+                         bulk.ep, bulk.len, bulk.timeout, bulk.data));
 
         ret = ioctl(fd, USBDEVFS_BULK, &bulk);
         if(ret < 0)
@@ -426,12 +449,22 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
             fprintf(stderr, "error writing to bulk endpoint 0x%x: %s\n",
                     ep, strerror(errno));
         }
-        sent += ret;
-        trace(4, fprintf(stderr, "usb_bulk_write:ioctl - sent %d bytes\n", ret));
+        else
+        {
+            sent += ret;
+        }
+        trace(4,
+              fprintf(stderr, "%s: ioctl - sent %d bytes\n", __func__, ret));
     }
     while((ret > 0) && (sent < length));
 
-    trace(3, fprintf(stderr, "usb_bulk_write: sent %d bytes\n", sent));
+    if((length % 0x200) == 0)
+    {
+        fprintf(stderr,
+                "WARNING: USB I/O is modulo 0x200 - this can trigger a bug in Topfield firmware.\n");
+    }
+
+    trace(3, fprintf(stderr, "%s: sent %d bytes\n", __func__, sent));
 
     return sent;
 }
@@ -444,8 +477,9 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
     ssize_t retrieved = 0;
     ssize_t requested;
 
-    trace(3, fprintf(stderr, "usb_bulk_read: requesting %d bytes, timeout %d\n",
-                     size, timeout));
+    trace(3,
+          fprintf(stderr, "%s: requesting %d bytes, timeout %d\n", __func__,
+                  size, timeout));
 
     /* Ensure the endpoint address is correct */
     ep |= USB_ENDPOINT_DIR_MASK;
@@ -462,10 +496,13 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
         bulk.timeout = timeout;
         bulk.data = (unsigned char *) bytes + retrieved;
 
-        trace(4, fprintf(stderr, "usb_bulk_read:ioctl - request %d bytes\n", bulk.len));
-        trace(5, fprintf(stderr,
-                "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
-                bulk.ep, bulk.len, bulk.timeout, bulk.data));
+        trace(4,
+              fprintf(stderr, "%s: ioctl - request %d bytes\n", __func__,
+                      bulk.len));
+        trace(5,
+              fprintf(stderr,
+                      "usbdevfs_bulktransfer: ep=0x%02x, len=%d, timeout=%d, data=%p\n",
+                      bulk.ep, bulk.len, bulk.timeout, bulk.data));
 
 
         ret = ioctl(fd, USBDEVFS_BULK, &bulk);
@@ -474,12 +511,18 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
             fprintf(stderr, "error %d reading from bulk endpoint 0x%x: %s\n",
                     errno, ep, strerror(errno));
         }
-        retrieved += ret;
-        trace(4, fprintf(stderr, "usb_bulk_read:ioctl - received %d bytes\n", ret));
+        else
+        {
+            retrieved += ret;
+        }
+        trace(4,
+              fprintf(stderr, "%s: ioctl - received %d bytes\n", __func__,
+                      ret));
     }
     while((ret > 0) && (retrieved < size) && (ret == requested));
 
-    trace(3, fprintf(stderr, "usb_bulk_read: returning %d bytes\n", retrieved));
+    trace(3,
+          fprintf(stderr, "%s: returning %d bytes\n", __func__, retrieved));
     return retrieved;
 }
 

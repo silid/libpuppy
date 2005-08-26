@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.22 2005/05/04 03:21:30 purbanec Exp $ */
+/* $Id: puppy.c,v 1.23 2005/08/26 16:22:58 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -27,7 +27,7 @@
 
 */
 
-#define PUPPY_RELEASE "1.10"
+#define PUPPY_RELEASE "1.11"
 
 #define _LARGEFILE64_SOURCE
 
@@ -58,7 +58,6 @@ extern time_t timezone;
 int lockFd = -1;
 int quiet = 0;
 char *devPath = NULL;
-int turbo_req = 0;
 __u32 cmd = 0;
 char *arg1 = NULL;
 char *arg2 = NULL;
@@ -74,12 +73,13 @@ int do_cmd_ready(int fd);
 int do_cmd_reset(int fd);
 int do_hdd_size(int fd);
 int do_hdd_dir(int fd, char *path);
-int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on);
-int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on);
+int do_hdd_file_put(int fd, char *srcPath, char *dstPath);
+int do_hdd_file_get(int fd, char *srcPath, char *dstPath);
 void decode_dir(struct tf_packet *p);
 int do_hdd_del(int fd, char *path);
 int do_hdd_rename(int fd, char *srcPath, char *dstPath);
 int do_hdd_mkdir(int fd, char *path);
+int do_cmd_turbo(int fd, char *state);
 void progressStats(__u64 totalSize, __u64 bytes, time_t startTime);
 void finalStats(__u64 bytes, time_t startTime);
 
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 
     /* Initialise timezone handling. */
     tzset();
-    
+
     lockFd = open("/tmp/puppy", O_CREAT, S_IRUSR | S_IWUSR);
     if(lockFd < 0)
     {
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
                 strerror(errno));
         return E_LOCK_FILE;
     }
-    
+
     r = parseArgs(argc, argv);
     if(r != 0)
     {
@@ -119,7 +119,8 @@ int main(int argc, char *argv[])
     /* Create a lock, so that other instances of puppy can detect this one. */
     if(0 != flock(lockFd, LOCK_SH | LOCK_NB))
     {
-        fprintf(stderr, "ERROR: Can not obtain shared lock on /tmp/puppy: %s\n",
+        fprintf(stderr,
+                "ERROR: Can not obtain shared lock on /tmp/puppy: %s\n",
                 strerror(errno));
         return E_GLOBAL_LOCK;
     }
@@ -133,7 +134,7 @@ int main(int argc, char *argv[])
                 devPath, strerror(errno));
         return E_READ_DEVICE;
     }
-    
+
     if(0 != flock(fd, LOCK_EX | LOCK_NB))
     {
         fprintf(stderr, "ERROR: Can not get exclusive lock on %s\n", devPath);
@@ -161,8 +162,7 @@ int main(int argc, char *argv[])
     r = ioctl(fd, USBDEVFS_RESET, NULL);
     if(r < 0)
     {
-        fprintf(stderr, "ERROR: Can not reset device: %s\n",
-                strerror(errno));
+        fprintf(stderr, "ERROR: Can not reset device: %s\n", strerror(errno));
         close(fd);
         return E_RESET_DEVICE;
     }
@@ -182,26 +182,19 @@ int main(int argc, char *argv[])
     }
 
     {
-      struct usbdevfs_setinterface interface0 = {0, 0};
+        struct usbdevfs_setinterface interface0 = { 0, 0 };
 
-      trace(2, fprintf(stderr, "USBDEVFS_SETNTERFACE\n"));
-      r = ioctl(fd, USBDEVFS_SETINTERFACE, &interface0);
-      if(r < 0)
-	{
-	  fprintf(stderr, "ERROR: Can not set interface zero: %s\n",
-		  strerror(errno));
-	  close(fd);
-	  return E_SET_INTERFACE;
-	}
+        trace(2, fprintf(stderr, "USBDEVFS_SETNTERFACE\n"));
+        r = ioctl(fd, USBDEVFS_SETINTERFACE, &interface0);
+        if(r < 0)
+        {
+            fprintf(stderr, "ERROR: Can not set interface zero: %s\n",
+                    strerror(errno));
+            close(fd);
+            return E_SET_INTERFACE;
+        }
     }
 
-    trace(2, fprintf(stderr, "pre-emptive cancel loop\n"));
-    for(int k = 0; k < 3; k++)
-    {
-        send_cancel(fd);
-        get_tf_packet(fd, &reply);
-    }
-    
     switch (cmd)
     {
         case CANCEL:
@@ -223,11 +216,11 @@ int main(int argc, char *argv[])
         case CMD_HDD_FILE_SEND:
             if(sendDirection == PUT)
             {
-                r = do_hdd_file_put(fd, arg1, arg2, turbo_req);
+                r = do_hdd_file_put(fd, arg1, arg2);
             }
             else
             {
-                r = do_hdd_file_get(fd, arg1, arg2, turbo_req);
+                r = do_hdd_file_get(fd, arg1, arg2);
             }
             break;
 
@@ -243,6 +236,10 @@ int main(int argc, char *argv[])
             r = do_hdd_mkdir(fd, arg1);
             break;
 
+        case CMD_TURBO:
+            r = do_cmd_turbo(fd, arg1);
+            break;
+
         default:
             fprintf(stderr, "BUG: Command 0x%08x not implemented\n", cmd);
             r = -EINVAL;
@@ -250,15 +247,22 @@ int main(int argc, char *argv[])
 
     {
         int interface = 0;
+
         ioctl(fd, USBDEVFS_RELEASEINTERFACE, &interface);
-	close(fd);
+        close(fd);
     }
     return r;
 }
 
-int switch_turbo(int fd, int turbo_on)
+int do_cmd_turbo(int fd, char *state)
 {
     int r;
+    int turbo_on = atoi(state);
+
+    if(0 == strcasecmp("ON", state))
+    {
+        turbo_on = 1;
+    }
 
     r = send_cmd_turbo(fd, turbo_on);
     if(r < 0)
@@ -277,12 +281,13 @@ int switch_turbo(int fd, int turbo_on)
         case SUCCESS:
             trace(1,
                   fprintf(stderr, "Turbo mode: %s\n",
-                          turbo_on ? "On" : "Off"));
+                          turbo_on ? "ON" : "OFF"));
             return 0;
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -315,7 +320,8 @@ int do_cmd_reset(int fd)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -348,7 +354,8 @@ int do_cmd_ready(int fd)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             get_u32(&reply.data);
             break;
 
@@ -383,7 +390,8 @@ int do_cancel(int fd)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -424,7 +432,8 @@ int do_hdd_size(int fd)
         }
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -457,7 +466,8 @@ int do_hdd_dir(int fd, char *path)
                 break;
 
             case FAIL:
-                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n",
+                        decode_error(&reply));
                 return -EPROTO;
                 break;
 
@@ -504,7 +514,7 @@ void decode_dir(struct tf_packet *p)
     }
 }
 
-int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
+int do_hdd_file_put(int fd, char *srcPath, char *dstPath)
 {
     int result = -EPROTO;
     time_t startTime = time(NULL);
@@ -519,30 +529,34 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
     int r;
     int update = 0;
     struct stat64 srcStat;
+    __u64 fileSize;
     __u64 byteCount = 0;
+
+    trace(4, fprintf(stderr, "%s\n", __func__));
 
     src = open64(srcPath, O_RDONLY);
     if(src < 0)
     {
-        fprintf(stderr, "ERROR: Can not open source file: %s\n", strerror(errno));
+        fprintf(stderr, "ERROR: Can not open source file: %s\n",
+                strerror(errno));
         return errno;
     }
 
     if(0 != fstat64(src, &srcStat))
     {
-        fprintf(stderr, "ERROR: Can not examine source file: %s\n", strerror(errno));
+        fprintf(stderr, "ERROR: Can not examine source file: %s\n",
+                strerror(errno));
         result = errno;
         goto out;
     }
-    
-    if(srcStat.st_size == 0)
+
+    fileSize = srcStat.st_size;
+    if(fileSize == 0)
     {
         fprintf(stderr, "ERROR: Source file is empty - not transfering.\n");
         result = -ENODATA;
         goto out;
     }
-
-    switch_turbo(fd, turbo_on);
 
     r = send_cmd_hdd_file_send(fd, PUT, dstPath);
     if(r < 0)
@@ -573,6 +587,9 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                         tf->name[94] = '\0';
                         tf->unused = 0;
                         tf->attrib = 0;
+                        trace(3,
+                              fprintf(stderr, "%s: DATA_HDD_FILE_START\n",
+                                      __func__));
                         r = send_tf_packet(fd, &packet);
                         if(r < 0)
                         {
@@ -588,19 +605,34 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                         int payloadSize = sizeof(packet.data) - 9;
                         ssize_t w = read(src, &packet.data[8], payloadSize);
 
+                        /* Detect a Topfield protcol bug and prevent the sending of packets
+                           that are a multiple of 512 bytes. */
+                        if((w > 4)
+                           &&
+                           (((((PACKET_HEAD_SIZE + 8 + w) +
+                               1) & ~1) % 0x200) == 0))
+                        {
+                            lseek64(src, -4, SEEK_CUR);
+                            w -= 4;
+                            payloadSize -= 4;
+                        }
+
                         put_u16(&packet.length, PACKET_HEAD_SIZE + 8 + w);
                         put_u32(&packet.cmd, DATA_HDD_FILE_DATA);
                         put_u64(packet.data, byteCount);
                         byteCount += w;
 
                         /* Detect EOF and transition to END */
-                        if(w < payloadSize)
+                        if((w < 0) || (byteCount >= fileSize))
                         {
                             state = END;
                         }
 
                         if(w > 0)
                         {
+                            trace(3,
+                                  fprintf(stderr, "%s: DATA_HDD_FILE_DATA\n",
+                                          __func__));
                             r = send_tf_packet(fd, &packet);
                             if(r < w)
                             {
@@ -611,8 +643,7 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
 
                         if(!update && !quiet)
                         {
-                            progressStats(srcStat.st_size, byteCount,
-                                          startTime);
+                            progressStats(fileSize, byteCount, startTime);
                         }
                         break;
                     }
@@ -621,6 +652,9 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                         /* Send end */
                         put_u16(&packet.length, PACKET_HEAD_SIZE);
                         put_u32(&packet.cmd, DATA_HDD_FILE_END);
+                        trace(3,
+                              fprintf(stderr, "%s: DATA_HDD_FILE_END\n",
+                                      __func__));
                         r = send_tf_packet(fd, &packet);
                         if(r < 0)
                         {
@@ -638,7 +672,8 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             case FAIL:
-                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n",
+                        decode_error(&reply));
                 goto out;
                 break;
 
@@ -648,14 +683,13 @@ int do_hdd_file_put(int fd, char *srcPath, char *dstPath, int turbo_on)
         }
     }
     finalStats(byteCount, startTime);
-    
-out:
+
+  out:
     close(src);
-    switch_turbo(fd, 0);
     return result;
 }
 
-int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
+int do_hdd_file_get(int fd, char *srcPath, char *dstPath)
 {
     int result = -EPROTO;
     time_t startTime = time(NULL);
@@ -680,7 +714,6 @@ int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
         return errno;
     }
 
-    switch_turbo(fd, turbo_on);
     r = send_cmd_hdd_file_send(fd, GET, srcPath);
     if(r < 0)
     {
@@ -730,7 +763,8 @@ int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
 
                     if(r < get_u16(&reply.length))
                     {
-                        fprintf(stderr, "ERROR: Short packet %d instead of %d\n", r,
+                        fprintf(stderr,
+                                "ERROR: Short packet %d instead of %d\n", r,
                                 get_u16(&reply.length));
                         /* TODO: Fetch the rest of the packet */
                     }
@@ -762,7 +796,8 @@ int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             case FAIL:
-                fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+                fprintf(stderr, "ERROR: Device reports %s\n",
+                        decode_error(&reply));
                 send_cancel(fd);
                 state = ABORT;
                 break;
@@ -772,15 +807,15 @@ int do_hdd_file_get(int fd, char *srcPath, char *dstPath, int turbo_on)
                 break;
 
             default:
-                fprintf(stderr, "ERROR: Unhandled packet (cmd 0x%x)\n", get_u32(&reply.cmd));
+                fprintf(stderr, "ERROR: Unhandled packet (cmd 0x%x)\n",
+                        get_u32(&reply.cmd));
         }
     }
     utime(dstPath, &mod_utime_buf);
     finalStats(byteCount, startTime);
-    
-out:
+
+  out:
     close(dst);
-    switch_turbo(fd, 0);
     return result;
 }
 
@@ -806,7 +841,8 @@ int do_hdd_del(int fd, char *path)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -837,7 +873,8 @@ int do_hdd_rename(int fd, char *srcPath, char *dstPath)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -868,7 +905,8 @@ int do_hdd_mkdir(int fd, char *path)
             break;
 
         case FAIL:
-            fprintf(stderr, "ERROR: Device reports %s\n", decode_error(&reply));
+            fprintf(stderr, "ERROR: Device reports %s\n",
+                    decode_error(&reply));
             break;
 
         default:
@@ -881,7 +919,8 @@ void progressStats(__u64 totalSize, __u64 bytes, time_t startTime)
 {
     int delta = time(NULL) - startTime;
 
-    if(quiet) return;
+    if(quiet)
+        return;
 
     if(delta > 0)
     {
@@ -901,7 +940,8 @@ void finalStats(__u64 bytes, time_t startTime)
 {
     int delta = time(NULL) - startTime;
 
-    if(quiet) return;
+    if(quiet)
+        return;
 
     if(delta > 0)
     {
@@ -915,15 +955,14 @@ void finalStats(__u64 bytes, time_t startTime)
 void usage(char *myName)
 {
     char *usageString =
-        "Usage: %s [-pPtv] [-d <device>] -c <command> [args]\n"
+        "Usage: %s [-pPqv] [-d <device>] -c <command> [args]\n"
         " -p             - packet header output to stderr\n"
         " -P             - full packet dump output to stderr\n"
-        " -t             - turbo mode on for file xfers\n"
-        " -v             - verbose output to stderr\n"
         " -q             - quiet transfers - no progress updates\n"
+        " -v             - verbose output to stderr\n"
         " -d <device>    - USB device (must be usbfs)\n"
         "                  for example /proc/bus/usb/001/003\n"
-        " -c <command>   - one of size, dir, get, put, rename, delete, mkdir, reboot, cancel\n"
+        " -c <command>   - one of size, dir, get, put, rename, delete, mkdir, reboot, cancel, turbo\n"
         " args           - optional arguments, as required by each command\n\n"
         "Version: " PUPPY_RELEASE ", Compiled: " __DATE__ "\n";
     fprintf(stderr, usageString, myName);
@@ -935,7 +974,7 @@ int parseArgs(int argc, char *argv[])
     extern int optind;
     int c;
 
-    while((c = getopt(argc, argv, "pPqtvd:c:")) != -1)
+    while((c = getopt(argc, argv, "pPqvd:c:")) != -1)
     {
         switch (c)
         {
@@ -953,10 +992,6 @@ int parseArgs(int argc, char *argv[])
 
             case 'q':
                 quiet = 1;
-                break;
-
-            case 't':
-                turbo_req = 1;
                 break;
 
             case 'd':
@@ -988,6 +1023,8 @@ int parseArgs(int argc, char *argv[])
                     cmd = CMD_HDD_RENAME;
                 else if(!strcasecmp(optarg, "mkdir"))
                     cmd = CMD_HDD_CREATE_DIR;
+                else if(!strcasecmp(optarg, "turbo"))
+                    cmd = CMD_TURBO;
                 break;
 
             default:
@@ -1082,6 +1119,19 @@ int parseArgs(int argc, char *argv[])
         }
     }
 
+    if(cmd == CMD_TURBO)
+    {
+        if(optind < argc)
+        {
+            arg1 = argv[optind];
+        }
+        else
+        {
+            fprintf(stderr, "ERROR: Specify 0=OFF or 1=ON.\n");
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -1102,10 +1152,11 @@ char *findToppy(void)
     /* Refuse to scan while another instance is running. */
     if(0 != flock(lockFd, LOCK_EX | LOCK_NB))
     {
-        fprintf(stderr, "ERROR: Can not scan for devices while another instance of puppy is running.\n");
+        fprintf(stderr,
+                "ERROR: Can not scan for devices while another instance of puppy is running.\n");
         return NULL;
     }
-    
+
     /* Open the /proc/bus/usb/devices file, and read it to find candidate Topfield devices. */
     if((toppy = fopen("/proc/bus/usb/devices", "r")) == NULL)
     {

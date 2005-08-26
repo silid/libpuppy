@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.h,v 1.13 2005/05/01 18:32:50 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.14 2005/08/26 16:25:34 purbanec Exp $ */
 
 /*
 
@@ -68,7 +68,9 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 /* Number of milliseconds to wait for a packet transfer to complete. */
-#define TF_PROTOCOL_TIMEOUT 1100
+
+/* This is intentionally large enough to allow for a HDD spin up. */
+#define TF_PROTOCOL_TIMEOUT 11000
 
 
 #define trace(level, msg) if(verbose >= level) { msg; }
@@ -81,14 +83,9 @@ extern int verbose;
  */
 extern int packet_trace;
 
-/* The maximum packet size used by the Toppy. This happens to be an
-   odd number, which could cause issues when the Topfield specific
-   byte swapping is applied. It's best to ensure that transmitted
-   packets contain an even number of bytes that is smaller than this
-   value.
+/* The maximum packet size used by the Toppy.
 */
-#define MAXIMUM_READ_PACKET_SIZE 0xFFFFL
-#define MAXIMUM_WRITE_PACKET_SIZE 0xFFFFL
+#define MAXIMUM_PACKET_SIZE 0xFFFFL
 
 /* The size of every packet header. */
 #define PACKET_HEAD_SIZE 8
@@ -99,7 +96,7 @@ struct tf_packet
     __u16 length;
     __u16 crc;
     __u32 cmd;
-    __u8 data[MAXIMUM_READ_PACKET_SIZE - PACKET_HEAD_SIZE];
+    __u8 data[MAXIMUM_PACKET_SIZE - PACKET_HEAD_SIZE];
 } __attribute__ ((packed));
 
 /* Topfield file descriptor data structure. */
