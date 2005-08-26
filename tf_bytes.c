@@ -1,5 +1,5 @@
 
-/* $Id: tf_bytes.c,v 1.3 2005/01/18 14:00:47 purbanec Exp $ */
+/* $Id: tf_bytes.c,v 1.4 2005/08/26 16:27:07 purbanec Exp $ */
 
 /*
 
@@ -42,7 +42,15 @@ __u16 get_u16(void *addr)
 {
     __u8 *b = addr;
 
-    return ((b[0] << 8) & 0xff00) | ((b[1] << 0) & 0x00ff);
+    return ((b[0] << 8) | (b[1] << 0));
+}
+
+/* Retrieve a 16-bit integer from the raw buffer (prior to byteswapping) */
+__u16 get_u16_raw(void *addr)
+{
+    __u8 *b = addr;
+
+    return ((b[1] << 8) | (b[0] << 0));
 }
 
 void put_u16(void *addr, __u16 val)
