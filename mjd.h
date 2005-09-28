@@ -1,5 +1,5 @@
 
-/* $Id: mjd.h,v 1.3 2005/01/18 14:00:46 purbanec Exp $ */
+/* $Id: mjd.h,v 1.4 2005/09/28 17:37:50 purbanec Exp $ */
 
 /*
 
@@ -40,7 +40,7 @@ struct tf_datetime
 } __attribute__ ((packed));
 
 
-time_t tfdt_to_time(struct tf_datetime *dt);
-void time_to_tfdt(time_t t, struct tf_datetime *dt);
+time_t tfdt_to_time(const struct tf_datetime *dt);
+void time_to_tfdt(const time_t t, struct tf_datetime *dt);
 
 #endif /* _MJD_H */

@@ -1,5 +1,5 @@
 
-/* $Id: tf_bytes.c,v 1.4 2005/08/26 16:27:07 purbanec Exp $ */
+/* $Id: tf_bytes.c,v 1.5 2005/09/28 17:37:50 purbanec Exp $ */
 
 /*
 
@@ -38,22 +38,22 @@
  * The USB I/O layer then takes care of CRC generation and byte swapping.
  */
 
-__u16 get_u16(void *addr)
+__u16 get_u16(const void *addr)
 {
-    __u8 *b = addr;
+    const __u8 *b = addr;
 
     return ((b[0] << 8) | (b[1] << 0));
 }
 
 /* Retrieve a 16-bit integer from the raw buffer (prior to byteswapping) */
-__u16 get_u16_raw(void *addr)
+__u16 get_u16_raw(const void *addr)
 {
-    __u8 *b = addr;
+    const __u8 *b = addr;
 
     return ((b[1] << 8) | (b[0] << 0));
 }
 
-void put_u16(void *addr, __u16 val)
+void put_u16(void *addr, const __u16 val)
 {
     __u8 *b = addr;
 
@@ -61,22 +61,22 @@ void put_u16(void *addr, __u16 val)
     b[1] = (val & 0xFF);
 }
 
-__u32 get_u32(void *addr)
+__u32 get_u32(const void *addr)
 {
-    __u8 *b = addr;
+    const __u8 *b = addr;
 
     return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | (b[3]);
 }
 
 /* Retrieve a 32-bit integer from the raw buffer (prior to byteswapping) */
-__u32 get_u32_raw(void *addr)
+__u32 get_u32_raw(const void *addr)
 {
-    __u8 *b = addr;
+    const __u8 *b = addr;
 
     return (b[1] << 24) | (b[0] << 16) | (b[3] << 8) | (b[2]);
 }
 
-void put_u32(void *addr, __u32 val)
+void put_u32(void *addr, const __u32 val)
 {
     __u8 *b = addr;
 
@@ -86,9 +86,9 @@ void put_u32(void *addr, __u32 val)
     b[3] = (val & 0xFF);
 }
 
-__u64 get_u64(void *addr)
+__u64 get_u64(const void *addr)
 {
-    __u8 *b = addr;
+    const __u8 *b = addr;
     __u64 r = b[0];
 
     r = (r << 8) | b[1];
@@ -101,7 +101,7 @@ __u64 get_u64(void *addr)
     return r;
 }
 
-void put_u64(void *addr, __u64 val)
+void put_u64(void *addr, const __u64 val)
 {
     __u8 *b = addr;
 

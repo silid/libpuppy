@@ -1,5 +1,5 @@
 
-/* $Id: tf_bytes.h,v 1.5 2005/08/26 16:27:07 purbanec Exp $ */
+/* $Id: tf_bytes.h,v 1.6 2005/09/28 17:37:50 purbanec Exp $ */
 
 /*
 
@@ -28,14 +28,14 @@
 
 #include <asm/types.h>
 
-__u16 get_u16(void *addr);
-__u16 get_u16_raw(void *addr);
-__u32 get_u32(void *addr);
-__u32 get_u32_raw(void *addr);
-__u64 get_u64(void *addr);
+__u16 get_u16(const void *addr);
+__u16 get_u16_raw(const void *addr);
+__u32 get_u32(const void *addr);
+__u32 get_u32_raw(const void *addr);
+__u64 get_u64(const void *addr);
 
-void put_u16(void *addr, __u16 val);
-void put_u32(void *addr, __u32 val);
-void put_u64(void *addr, __u64 val);
+void put_u16(void *addr, const __u16 val);
+void put_u32(void *addr, const __u32 val);
+void put_u64(void *addr, const __u64 val);
 
 #endif /* _TF_BYTES_H */

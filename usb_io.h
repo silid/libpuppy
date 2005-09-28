@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.h,v 1.14 2005/08/26 16:25:34 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.15 2005/09/28 17:37:50 purbanec Exp $ */
 
 /*
 
@@ -111,38 +111,38 @@ struct typefile
 } __attribute__ ((packed));
 
 
-ssize_t send_success(int fd);
-ssize_t send_cancel(int fd);
-ssize_t send_cmd_ready(int fd);
-ssize_t send_cmd_reset(int fd);
-ssize_t send_cmd_turbo(int fd, int turbo_on);
-ssize_t send_cmd_hdd_size(int fd);
-ssize_t send_cmd_hdd_dir(int fd, char *path);
-ssize_t send_cmd_hdd_file_send(int fd, __u8 dir, char *path);
-ssize_t send_cmd_hdd_del(int fd, char *path);
-ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst);
-ssize_t send_cmd_hdd_create_dir(int fd, char *path);
+ssize_t send_success(const int fd);
+ssize_t send_cancel(const int fd);
+ssize_t send_cmd_ready(const int fd);
+ssize_t send_cmd_reset(const int fd);
+ssize_t send_cmd_turbo(const int fd, const int turbo_on);
+ssize_t send_cmd_hdd_size(const int fd);
+ssize_t send_cmd_hdd_dir(const int fd, const char *path);
+ssize_t send_cmd_hdd_file_send(const int fd, const __u8 dir, const char *path);
+ssize_t send_cmd_hdd_del(const int fd, const char *path);
+ssize_t send_cmd_hdd_rename(const int fd, const char *src, const char *dst);
+ssize_t send_cmd_hdd_create_dir(const int fd, const char *path);
 
-void print_packet(struct tf_packet *packet, char *prefix);
+void print_packet(const struct tf_packet *packet, const char *prefix);
 
-ssize_t get_tf_packet(int fd, struct tf_packet *packet);
-ssize_t send_tf_packet(int fd, struct tf_packet *packet);
+ssize_t get_tf_packet(const int fd, struct tf_packet *packet);
+ssize_t send_tf_packet(const int fd, struct tf_packet *packet);
 
-ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size,
-                      int timeout);
-ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
-                       int timeout);
+ssize_t usb_bulk_read(const int fd, const int ep, const __u8 * bytes,
+                      const ssize_t size, const int timeout);
+ssize_t usb_bulk_write(const int fd, const int ep, const __u8 * bytes,
+                       const ssize_t length, const int timeout);
 
 ssize_t read_device_descriptor(const int fd,
                                struct usb_device_descriptor *desc);
 ssize_t read_config_descriptor(const int fd,
                                struct usb_config_descriptor *desc);
-ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header *desc,
+ssize_t discard_extra_desc_data(const int fd, struct usb_descriptor_header *desc,
                                 ssize_t descSize);
 
-void print_device_descriptor(struct usb_device_descriptor *desc);
-void print_config_descriptor(struct usb_config_descriptor *desc);
+void print_device_descriptor(const struct usb_device_descriptor *desc);
+void print_config_descriptor(const struct usb_config_descriptor *desc);
 
-char *decode_error(struct tf_packet *packet);
+char *decode_error(const struct tf_packet *packet);
 
 #endif /* _USB_IO_H */
