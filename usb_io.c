@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.c,v 1.15 2005/08/26 16:25:33 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.16 2005/09/28 17:39:41 purbanec Exp $ */
 
 /*
 
@@ -101,7 +101,7 @@ static __u8 success_packet[8] = {
 };
 
 /* Optimised packet handling to reduce overhead during bulk file transfers. */
-ssize_t send_cancel(int fd)
+ssize_t send_cancel(const int fd)
 {
     trace(2, fprintf(stderr, "%s\n", __func__));
 
@@ -165,7 +165,7 @@ __u16 get_crc(struct tf_packet * packet)
     return crc16_ansi(&(packet->cmd), get_u16(&packet->length) - 4);
 }
 
-ssize_t send_cmd_hdd_dir(int fd, char *path)
+ssize_t send_cmd_hdd_dir(const int fd, const char *path)
 {
     struct tf_packet req;
     __u16 packetSize;
@@ -187,7 +187,7 @@ ssize_t send_cmd_hdd_dir(int fd, char *path)
     return send_tf_packet(fd, &req);
 }
 
-int send_cmd_hdd_file_send(int fd, __u8 dir, char *path)
+ssize_t send_cmd_hdd_file_send(const int fd, __u8 dir, const char *path)
 {
     struct tf_packet req;
     __u16 packetSize;
@@ -211,7 +211,7 @@ int send_cmd_hdd_file_send(int fd, __u8 dir, char *path)
     return send_tf_packet(fd, &req);
 }
 
-ssize_t send_cmd_hdd_del(int fd, char *path)
+ssize_t send_cmd_hdd_del(const int fd, const char *path)
 {
     struct tf_packet req;
     __u16 packetSize;
@@ -233,7 +233,7 @@ ssize_t send_cmd_hdd_del(int fd, char *path)
     return send_tf_packet(fd, &req);
 }
 
-ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst)
+ssize_t send_cmd_hdd_rename(const int fd, const char *src, const char *dst)
 {
     struct tf_packet req;
     __u16 packetSize;
@@ -260,7 +260,7 @@ ssize_t send_cmd_hdd_rename(int fd, char *src, char *dst)
     return send_tf_packet(fd, &req);
 }
 
-ssize_t send_cmd_hdd_create_dir(int fd, char *path)
+ssize_t send_cmd_hdd_create_dir(const int fd, const char *path)
 {
     struct tf_packet req;
     __u16 packetSize;
@@ -283,7 +283,7 @@ ssize_t send_cmd_hdd_create_dir(int fd, char *path)
     return send_tf_packet(fd, &req);
 }
 
-void print_packet(struct tf_packet *packet, char *prefix)
+void print_packet(const struct tf_packet *packet, const char *prefix)
 {
     int i;
     __u8 *d = (__u8 *) packet;
@@ -410,18 +410,15 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 #define MAX_WRITE	4096
 
 /* This function is adapted from libusb */
-ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
-                       int timeout)
+ssize_t usb_bulk_write(const int fd, const int ep, const __u8 * bytes,
+                       const ssize_t length, const int timeout)
 {
     struct usbdevfs_bulktransfer bulk;
     ssize_t ret;
     ssize_t sent = 0;
 
     trace(3, fprintf(stderr, "%s: sending %d bytes, timeout %d\n", __func__,
-                     length, timeout));
-
-    /* Ensure the endpoint direction is correct */
-    ep &= ~USB_ENDPOINT_DIR_MASK;
+                     (int) length, timeout));
 
     do
     {
@@ -454,7 +451,7 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
             sent += ret;
         }
         trace(4,
-              fprintf(stderr, "%s: ioctl - sent %d bytes\n", __func__, ret));
+              fprintf(stderr, "%s: ioctl - sent %d bytes\n", __func__, (int) ret));
     }
     while((ret > 0) && (sent < length));
 
@@ -464,13 +461,14 @@ ssize_t usb_bulk_write(int fd, int ep, __u8 * bytes, ssize_t length,
                 "WARNING: USB I/O is modulo 0x200 - this can trigger a bug in Topfield firmware.\n");
     }
 
-    trace(3, fprintf(stderr, "%s: sent %d bytes\n", __func__, sent));
+    trace(3, fprintf(stderr, "%s: sent %d bytes\n", __func__, (int) sent));
 
     return sent;
 }
 
 /* This function is adapted from libusb */
-ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
+ssize_t usb_bulk_read(const int fd, const int ep, const __u8 * bytes,
+                      const ssize_t size, const int timeout)
 {
     struct usbdevfs_bulktransfer bulk;
     ssize_t ret;
@@ -479,10 +477,7 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
 
     trace(3,
           fprintf(stderr, "%s: requesting %d bytes, timeout %d\n", __func__,
-                  size, timeout));
-
-    /* Ensure the endpoint address is correct */
-    ep |= USB_ENDPOINT_DIR_MASK;
+                  (int) size, timeout));
 
     do
     {
@@ -517,12 +512,12 @@ ssize_t usb_bulk_read(int fd, int ep, __u8 * bytes, ssize_t size, int timeout)
         }
         trace(4,
               fprintf(stderr, "%s: ioctl - received %d bytes\n", __func__,
-                      ret));
+                      (int) ret));
     }
     while((ret > 0) && (retrieved < size) && (ret == requested));
 
     trace(3,
-          fprintf(stderr, "%s: returning %d bytes\n", __func__, retrieved));
+          fprintf(stderr, "%s: returning %d bytes\n", __func__, (int) retrieved));
     return retrieved;
 }
 
@@ -557,7 +552,7 @@ ssize_t read_config_descriptor(const int fd,
     return r;
 }
 
-ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc,
+ssize_t discard_extra_desc_data(const int fd, struct usb_descriptor_header * desc,
                                 ssize_t descSize)
 {
     int r;
@@ -569,7 +564,7 @@ ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc,
         ssize_t extraSize = desc->bLength - descSize;
 
         fprintf(stderr, "Discarding %d bytes from oversized descriptor\n",
-                extraSize);
+                (int) extraSize);
 
         extra = malloc(extraSize);
         if(extra != NULL)
@@ -580,7 +575,7 @@ ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc,
             {
                 fprintf(stderr,
                         "Read %d instead of %d for oversized descriptor\n", r,
-                        extraSize);
+                        (int) extraSize);
                 return -1;
             }
         }
@@ -588,14 +583,14 @@ ssize_t discard_extra_desc_data(int fd, struct usb_descriptor_header * desc,
         {
             fprintf(stderr,
                     "Failed to allocate %d bytes for oversized descriptor\n",
-                    extraSize);
+                    (int) extraSize);
             return -1;
         }
     }
     return 0;
 }
 
-void print_device_descriptor(struct usb_device_descriptor *desc)
+void print_device_descriptor(const struct usb_device_descriptor *desc)
 {
     fprintf(stderr, "\nusb_device_descriptor 0x%p\n", (void *) desc);
     fprintf(stderr, "bLength.................0x%02x\n", desc->bLength);
@@ -619,7 +614,7 @@ void print_device_descriptor(struct usb_device_descriptor *desc)
             desc->bNumConfigurations);
 }
 
-void print_config_descriptor(struct usb_config_descriptor *desc)
+void print_config_descriptor(const struct usb_config_descriptor *desc)
 {
     fprintf(stderr, "\nusb_config_descriptor 0x%p\n", (void *) desc);
     fprintf(stderr, "bLength.................0x%02x\n", desc->bLength);
@@ -634,7 +629,7 @@ void print_config_descriptor(struct usb_config_descriptor *desc)
     fprintf(stderr, "bMaxPower...............0x%02x\n\n", desc->bMaxPower);
 }
 
-char *decode_error(struct tf_packet *packet)
+char *decode_error(const struct tf_packet *packet)
 {
     __u32 ecode = get_u32(packet->data);
 

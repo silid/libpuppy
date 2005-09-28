@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.23 2005/08/26 16:22:58 purbanec Exp $ */
+/* $Id: puppy.c,v 1.24 2005/09/28 17:39:41 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -27,7 +27,7 @@
 
 */
 
-#define PUPPY_RELEASE "1.11"
+#define PUPPY_RELEASE "1.12"
 
 #define _LARGEFILE64_SOURCE
 
