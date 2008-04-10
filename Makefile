@@ -1,5 +1,5 @@
-# Copyright (C) 2004 Peter Urbanec
-# $Id: Makefile,v 1.7 2005/05/01 18:27:00 purbanec Exp $
+# Copyright (C) 2004-2008 Peter Urbanec
+# $Id: Makefile,v 1.8 2008/04/10 05:44:21 purbanec Exp $
 
 ifdef CROSS
 ifeq ($(CROSS),gearbox)
@@ -47,6 +47,10 @@ clean:
 	-rm -f *.o
 	-rm -f *~
 	-rm -f puppy
+
+install: puppy
+	@echo "\npuppy does not require installation.\nJust copy the file 'puppy' to wherever you like!"
+
 
 crc16.o: crc16.c crc16.h
 mjd.o: mjd.c mjd.h tf_bytes.h
