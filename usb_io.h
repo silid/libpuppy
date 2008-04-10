@@ -1,9 +1,9 @@
 
-/* $Id: usb_io.h,v 1.15 2005/09/28 17:37:50 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.16 2008/04/10 05:09:38 purbanec Exp $ */
 
 /*
 
-  Copyright (C) 2004 Peter Urbanec <toppy at urbanec.net>
+  Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
   This file is part of puppy.
 
@@ -30,11 +30,12 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
-#include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #include "usb_ch9.h"
+#else
+#include <linux/usb/ch9.h>
 #endif
 
 #include "mjd.h"
