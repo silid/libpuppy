@@ -1,9 +1,9 @@
 
-/* $Id: usb_io.c,v 1.16 2005/09/28 17:39:41 purbanec Exp $ */
+/* $Id: usb_io.c,v 1.17 2008/04/10 05:48:02 purbanec Exp $ */
 
 /*
 
-  Copyright (C) 2004 Peter Urbanec <toppy at urbanec.net>
+  Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
   This file is part of puppy.
 
@@ -54,6 +54,7 @@
 /* 2+ - dump entire packet */
 int packet_trace = 0;
 int verbose = 0;
+int ignore_crc = 0;
 
 /* Swap the odd and even bytes in the buffer, up to count bytes.
  * If count is odd, the last byte remains unafected.
@@ -350,6 +351,7 @@ ssize_t send_tf_packet(int fd, struct tf_packet *packet)
 ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 {
     __u8 *buf = (__u8 *) packet;
+    __u16 len = 0;
     int r;
 
     trace(3, fprintf(stderr, "get_tf_packet\n"));
@@ -376,17 +378,19 @@ ssize_t get_tf_packet(int fd, struct tf_packet * packet)
 
     swap_in_packet(packet);
 
+    len = get_u16(&packet->length);
+
+    if(len < PACKET_HEAD_SIZE)
+    {
+        fprintf(stderr, "Invalid packet length %04x\n", len);
+        return -1;
+    }
+
+    /* Ignore CRC - support for USB accellerator patch. */
+    if(!ignore_crc)
     {
         __u16 crc;
         __u16 calc_crc;
-        __u16 len = get_u16(&packet->length);
-
-        if(len < PACKET_HEAD_SIZE)
-        {
-            fprintf(stderr, "Invalid packet length %04x\n", len);
-            return -1;
-        }
-
         crc = get_u16(&packet->crc);
         calc_crc = get_crc(packet);
 

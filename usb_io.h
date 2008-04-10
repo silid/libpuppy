@@ -1,5 +1,5 @@
 
-/* $Id: usb_io.h,v 1.16 2008/04/10 05:09:38 purbanec Exp $ */
+/* $Id: usb_io.h,v 1.17 2008/04/10 05:48:02 purbanec Exp $ */
 
 /*
 
@@ -83,6 +83,8 @@ extern int verbose;
    2+ - dump entire packet
  */
 extern int packet_trace;
+
+extern int ignore_crc;
 
 /* The maximum packet size used by the Toppy.
 */

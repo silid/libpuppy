@@ -1,5 +1,5 @@
 
-/* $Id: puppy.c,v 1.24 2005/09/28 17:39:41 purbanec Exp $ */
+/* $Id: puppy.c,v 1.25 2008/04/10 05:48:02 purbanec Exp $ */
 
 /* Format using indent and the following options:
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
@@ -7,7 +7,7 @@
 
 /*
 
-  Copyright (C) 2004 Peter Urbanec <toppy at urbanec.net>
+  Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
   This file is part of puppy.
 
@@ -27,7 +27,7 @@
 
 */
 
-#define PUPPY_RELEASE "1.12"
+#define PUPPY_RELEASE "1.14"
 
 #define _LARGEFILE64_SOURCE
 
@@ -955,7 +955,8 @@ void finalStats(__u64 bytes, time_t startTime)
 void usage(char *myName)
 {
     char *usageString =
-        "Usage: %s [-pPqv] [-d <device>] -c <command> [args]\n"
+        "Usage: %s [-ipPqv] [-d <device>] -c <command> [args]\n"
+        " -i             - ignore packet CRCs (for compatibility with USB accelerator patch)\n"
         " -p             - packet header output to stderr\n"
         " -P             - full packet dump output to stderr\n"
         " -q             - quiet transfers - no progress updates\n"
@@ -974,10 +975,14 @@ int parseArgs(int argc, char *argv[])
     extern int optind;
     int c;
 
-    while((c = getopt(argc, argv, "pPqvd:c:")) != -1)
+    while((c = getopt(argc, argv, "ipPqvd:c:")) != -1)
     {
         switch (c)
         {
+            case 'i':
+                ignore_crc = 1;
+                break;
+
             case 'v':
                 verbose++;
                 break;

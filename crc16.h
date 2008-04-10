@@ -1,9 +1,9 @@
 
-/* $Id: crc16.h,v 1.2 2005/01/18 14:00:46 purbanec Exp $ */
+/* $Id: crc16.h,v 1.3 2008/04/10 05:48:02 purbanec Exp $ */
 
 /*
 
-  Copyright (C) 2004 Peter Urbanec <toppy at urbanec.net>
+  Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
   This file is part of puppy.
 

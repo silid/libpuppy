@@ -1,9 +1,9 @@
 
-/* $Id: mjd.h,v 1.4 2005/09/28 17:37:50 purbanec Exp $ */
+/* $Id: mjd.h,v 1.5 2008/04/10 05:48:02 purbanec Exp $ */
 
 /*
 
-  Copyright (C) 2004 Peter Urbanec <toppy at urbanec.net>
+  Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
   This file is part of puppy.
 
