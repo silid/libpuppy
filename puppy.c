@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <printf.h>
 #include <string.h>
 #include <time.h>
 #include <utime.h>
@@ -64,7 +65,10 @@ char *arg2 = NULL;
 __u8 sendDirection = GET;
 struct tf_packet packet;
 struct tf_packet reply;
+int xml = 0;
 
+int quote_xml(FILE *stream, const struct printf_info *info, const void *const *args);
+int quote_xml_arginfo(const struct printf_info *info, size_t n, int *argtypes);
 int parseArgs(int argc, char *argv[]);
 int isToppy(struct usb_device_descriptor *desc);
 char *findToppy(void);
@@ -101,6 +105,8 @@ int main(int argc, char *argv[])
 
     /* Initialise timezone handling. */
     tzset();
+
+    register_printf_function('W', quote_xml, quote_xml_arginfo);
 
     lockFd = open("/tmp/puppy", O_CREAT, S_IRUSR | S_IWUSR);
     if(lockFd < 0)
@@ -479,6 +485,36 @@ int do_hdd_dir(int fd, char *path)
     return -EPROTO;
 }
 
+/* Needs to use a custom quoting (URL quoting) as we need to transfer character 5
+   Apparently &#5; isn't valid XML. (Not a character?) */
+int quote_xml(FILE *stream, const struct printf_info *info, const void *const *args)
+{
+  const char* const * p = *args;
+  int len = 0;
+  (void) info;
+  const char* valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ '-+.";
+  while ((*p)[len]) {
+    int ch = (unsigned char) (*p)[len];
+    if (strchr(valid_chars, ch)) {
+      fprintf(stream, "%c", ch);
+    } else {
+      fprintf(stream, "%%%02x", ch);
+    }
+    ++len;
+  }
+  return len;
+}
+
+int quote_xml_arginfo(const struct printf_info *info, size_t n,
+                      int *argtypes)
+{
+  (void) info;
+  if (n > 0) {
+    argtypes[0] = PA_POINTER;
+  }
+  return 1;
+}
+
 void decode_dir(struct tf_packet *p)
 {
     __u16 count =
@@ -486,31 +522,55 @@ void decode_dir(struct tf_packet *p)
     struct typefile *entries = (struct typefile *) p->data;
     int i;
     time_t timestamp;
-
+    if (xml) {
+      printf("<?xml version=\"1.0\" encoding=\"ISO-8859-15\"?>\r\n\r\n");
+      printf("<contents>\n");
+    }
     for(i = 0; (i < count); i++)
     {
-        char type;
-
-        switch (entries[i].filetype)
-        {
-            case 1:
-                type = 'd';
-                break;
-
-            case 2:
-                type = 'f';
-                break;
-
-            default:
-                type = '?';
-        }
-
         /* This makes the assumption that the timezone of the Toppy and the system
          * that puppy runs on are the same. Given the limitations on the length of
          * USB cables, this condition is likely to be satisfied. */
+      struct tm tm;
         timestamp = tfdt_to_time(&entries[i].stamp);
-        printf("%c %20llu %24.24s %s\n", type, get_u64(&entries[i].size),
-               ctime(&timestamp), entries[i].name);
+        tm = *localtime(&timestamp);
+        if (xml) {
+          int ft = entries[i].filetype;
+          printf("<file type=\"%s\" size=\"%llu\" time=\"%04d-%02d-%02d %d:%02d:%02d\" name=\"%W\"/>\n",
+                 ft == 1 ? "dir" :
+                 ft == 2 ? "file" :
+                           "unknown",
+                 get_u64(&entries[i].size),
+                 tm.tm_year + 1900,
+                 tm.tm_mon + 1,
+                 tm.tm_mday,
+                 tm.tm_hour,
+                 tm.tm_min,
+                 tm.tm_sec,
+                 entries[i].name);
+        } else {
+          char type;
+
+          switch (entries[i].filetype)
+          {
+          case 1:
+            type = 'd';
+            break;
+
+          case 2:
+            type = 'f';
+            break;
+
+          default:
+            type = '?';
+          }
+
+          printf("%c %20llu %24.24s %s\n", type, get_u64(&entries[i].size),
+                 ctime(&timestamp), entries[i].name);
+        }
+    }
+    if (xml) {
+      printf("</contents>\n");
     }
 }
 
@@ -961,6 +1021,7 @@ void usage(char *myName)
         " -P             - full packet dump output to stderr\n"
         " -q             - quiet transfers - no progress updates\n"
         " -v             - verbose output to stderr\n"
+        " -x             - output xml (implemented to dir)\n"
         " -d <device>    - USB device (must be usbfs)\n"
         "                  for example /proc/bus/usb/001/003\n"
         " -c <command>   - one of size, dir, get, put, rename, delete, mkdir, reboot, cancel, turbo\n"
@@ -975,7 +1036,7 @@ int parseArgs(int argc, char *argv[])
     extern int optind;
     int c;
 
-    while((c = getopt(argc, argv, "ipPqvd:c:")) != -1)
+    while((c = getopt(argc, argv, "ipPqvd:c:x")) != -1)
     {
         switch (c)
         {
@@ -1031,6 +1092,10 @@ int parseArgs(int argc, char *argv[])
                 else if(!strcasecmp(optarg, "turbo"))
                     cmd = CMD_TURBO;
                 break;
+
+            case 'x':
+              xml = 1;
+              break;
 
             default:
                 usage(argv[0]);
