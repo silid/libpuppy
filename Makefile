@@ -44,9 +44,13 @@ strip: puppy
 	${STRIP} puppy
 
 clean:
-	-rm -f *.o
+	-rm -f *.o *.a
 	-rm -f *~
 	-rm -f puppy
+
+libpuppy.a: libpuppy.o usb_io.o crc16.o tf_bytes.o mjd.o buffer.o
+	ar r $@ $^
+	ranlib $@
 
 install: puppy
 	@echo "\npuppy does not require installation.\nJust copy the file 'puppy' to wherever you like!"
