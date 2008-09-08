@@ -36,7 +36,7 @@ LDFLAGS+=-Wl,-O2
 
 endif
 
-CFLAGS+=-std=gnu99 -Wall -W -Wshadow -Wstrict-prototypes -pedantic -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2
+CFLAGS+=-std=gnu99 -Wall -W -Wshadow -Wstrict-prototypes -pedantic -fexpensive-optimizations -fomit-frame-pointer -frename-registers -O2 -g
 
 puppy: puppy.o crc16.o mjd.o tf_bytes.o usb_io.o
 
@@ -51,6 +51,9 @@ clean:
 libpuppy.a: libpuppy.o usb_io.o crc16.o tf_bytes.o mjd.o buffer.o
 	ar r $@ $^
 	ranlib $@
+
+puppytest: puppytest.o libpuppy.a
+	$(CC) -o $@ $^
 
 install: puppy
 	@echo "\npuppy does not require installation.\nJust copy the file 'puppy' to wherever you like!"
