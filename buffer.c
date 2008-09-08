@@ -53,7 +53,7 @@ void* buffer_add(buffer_t a_buffer, void* a_value)
     // doesn't handle oom
     a_buffer->data = realloc(a_buffer->data, a_buffer->el_size * a_buffer->allocated_els);
   }
-  ptr = a_buffer->data + a_buffer->cur_els * a_buffer->el_size;
+  ptr = (char*) a_buffer->data + a_buffer->cur_els * a_buffer->el_size;
   if (a_value) {
     memcpy(ptr, a_value, a_buffer->el_size);
   }
