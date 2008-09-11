@@ -28,7 +28,7 @@ int main(int a_c, char **a_v)
                 struct tm tm = *localtime(&ptr->time);
 
                 strftime(tmStr, sizeof(tmStr), "%Y-%m-%d %H:%M:%S", &tm);
-                printf("%s %s\n", tmStr, ptr->name);
+                printf("%s %12lld  %s\n", tmStr, ptr->size, ptr->name);
             }
             ++ptr;
         }
