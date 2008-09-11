@@ -55,6 +55,9 @@ libpuppy.a: libpuppy.o usb_io.o crc16.o tf_bytes.o mjd.o buffer.o
 puppy-dir: puppy-dir.o libpuppy.a tools.o
 	$(CC) -o $@ $^
 
+puppy-get: puppy-get.o libpuppy.a tools.o
+	$(CC) -o $@ $^
+
 install: puppy
 	@echo "\npuppy does not require installation.\nJust copy the file 'puppy' to wherever you like!"
 
