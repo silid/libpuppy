@@ -439,7 +439,7 @@ int puppy_hdd_size(puppy_t p)
     return -EPROTO;
 }
 
-puppy_dir_entry_t *puppy_hdd_dir(puppy_t p, char *path)
+puppy_dir_entry_t *puppy_hdd_dir(puppy_t p, const char *path)
 {
     int r;
     buffer_t buf = buffer_init(10, sizeof(struct puppy_dir_entry));
@@ -524,7 +524,7 @@ void decode_dir(struct tf_packet *p, buffer_t buf)
     }
 }
 
-int puppy_hdd_file_put(puppy_t p, char *srcPath, char *dstPath)
+int puppy_hdd_file_put(puppy_t p, const char *srcPath, const char *dstPath)
 {
     int result = -EPROTO;
     time_t startTime = time(NULL);
@@ -699,7 +699,7 @@ int puppy_hdd_file_put(puppy_t p, char *srcPath, char *dstPath)
     return result;
 }
 
-int puppy_hdd_file_get(puppy_t p, char *srcPath, char *dstPath)
+int puppy_hdd_file_get(puppy_t p, const char *srcPath, const char *dstPath)
 {
     int result = -EPROTO;
     time_t startTime = time(NULL);
@@ -829,7 +829,7 @@ int puppy_hdd_file_get(puppy_t p, char *srcPath, char *dstPath)
     return result;
 }
 
-int puppy_hdd_del(puppy_t p, char *path)
+int puppy_hdd_del(puppy_t p, const char *path)
 {
     int r;
 
@@ -861,7 +861,7 @@ int puppy_hdd_del(puppy_t p, char *path)
     return -EPROTO;
 }
 
-int puppy_hdd_rename(puppy_t p, char *srcPath, char *dstPath)
+int puppy_hdd_rename(puppy_t p, const char *srcPath, const char *dstPath)
 {
     int r;
 
@@ -893,7 +893,7 @@ int puppy_hdd_rename(puppy_t p, char *srcPath, char *dstPath)
     return -EPROTO;
 }
 
-int puppy_hdd_mkdir(puppy_t p, char *path)
+int puppy_hdd_mkdir(puppy_t p, const char *path)
 {
     int r;
 
