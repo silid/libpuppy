@@ -58,10 +58,11 @@ puppytest: puppytest.o libpuppy.a
 install: puppy
 	@echo "\npuppy does not require installation.\nJust copy the file 'puppy' to wherever you like!"
 
-
+buffer.o: buffer.c buffer.h
 crc16.o: crc16.c crc16.h
+libpuppy.o: libpuppy.c usb_io.h mjd.h tf_bytes.h buffer.h libpuppy.h
 mjd.o: mjd.c mjd.h tf_bytes.h
 puppy.o: puppy.c usb_io.h mjd.h tf_bytes.h
+puppytest.o: puppytest.c libpuppy.h
 tf_bytes.o: tf_bytes.c tf_bytes.h
 usb_io.o: usb_io.c usb_io.h mjd.h tf_bytes.h crc16.h
-
