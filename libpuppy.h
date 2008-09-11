@@ -1,3 +1,4 @@
+// -*- c-basic-offset: 4 -*-
 
 /* $Id: puppy.c,v 1.25 2008/04/10 05:48:02 purbanec Exp $ */
 
