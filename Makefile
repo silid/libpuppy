@@ -52,7 +52,7 @@ libpuppy.a: libpuppy.o usb_io.o crc16.o tf_bytes.o mjd.o buffer.o
 	ar r $@ $^
 	ranlib $@
 
-puppy-dir: puppy-dir.o libpuppy.a
+puppy-dir: puppy-dir.o libpuppy.a tools.o
 	$(CC) -o $@ $^
 
 install: puppy
@@ -63,6 +63,7 @@ crc16.o: crc16.c crc16.h
 libpuppy.o: libpuppy.c usb_io.h mjd.h tf_bytes.h buffer.h libpuppy.h
 mjd.o: mjd.c mjd.h tf_bytes.h
 puppy.o: puppy.c usb_io.h mjd.h tf_bytes.h
-puppy-dir.o: puppy-dir.c libpuppy.h
+puppy-dir.o: puppy-dir.c libpuppy.h tools.h
 tf_bytes.o: tf_bytes.c tf_bytes.h
 usb_io.o: usb_io.c usb_io.h mjd.h tf_bytes.h crc16.h
+tools.o: tools.c tools.h
