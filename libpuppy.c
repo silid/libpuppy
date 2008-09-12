@@ -109,11 +109,11 @@ puppy_t puppy_open(const char *devPath)
     p->fd = -1;
     p->error = 0;
 
-    p->lockFd = open("/tmp/puppy", O_CREAT, S_IRUSR | S_IWUSR);
+    p->lockFd = open(PUPPY_LOCKFILE, O_CREAT, S_IRUSR | S_IWUSR);
     if(p->lockFd < 0)
     {
-        fprintf(stderr, "ERROR: Can not open lock file /tmp/puppy: %s\n",
-                strerror(errno));
+        fprintf(stderr, "ERROR: Can not open lock file %s: %s\n",
+                PUPPY_LOCKFILE, strerror(errno));
         p->error = E_LOCK_FILE;
         return p;
     }
@@ -122,8 +122,8 @@ puppy_t puppy_open(const char *devPath)
     if(0 != flock(p->lockFd, LOCK_SH | LOCK_NB))
     {
         fprintf(stderr,
-                "ERROR: Can not obtain shared lock on /tmp/puppy: %s\n",
-                strerror(errno));
+                "ERROR: Can not obtain shared lock on %s: %s\n",
+                PUPPY_LOCKFILE, strerror(errno));
         p->error = E_GLOBAL_LOCK;
         close(p->lockFd);
         p->lockFd = -1;
@@ -251,6 +251,7 @@ void puppy_done(puppy_t p)
 
         ioctl(p->fd, USBDEVFS_RELEASEINTERFACE, &interface);
         close(p->fd);
+        unlink(PUPPY_LOCKFILE);
         close(p->lockFd);
 
         free(p);

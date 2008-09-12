@@ -30,6 +30,8 @@
 
 #define PUPPY_RELEASE "1.14"
 
+#define PUPPY_LOCKFILE "/tmp/puppy"
+
 struct puppy;
 
 typedef enum puppy_ftype
