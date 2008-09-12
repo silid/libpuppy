@@ -50,22 +50,18 @@ int main(int a_c, char **a_v)
                     strftime(tmStr, sizeof(tmStr), "%Y-%m-%d %H:%M:%S", &tm);
                     printf("%s %12lld %s\n", tmStr, ptr->size, dst);
 
-                    if (stat(dst, &statbuf) == 0 &&
-                        statbuf.st_size == ptr->size)
+                    if(stat(dst, &statbuf) == 0 &&
+                       statbuf.st_size == ptr->size)
                     {
                         printf("File already transferred in full, skipping.\n");
                     }
                     else 
                     {                        
-                        struct utimbuf utimbuf;
-                        
                         puppy_hdd_file_get(p, src, dst);
 
-                        utimbuf.actime = ptr->time;
-                        utimbuf.modtime = ptr->time;
-
-                        if (stat(dst, &statbuf) == 0) {
-                            if (statbuf.st_size != ptr->size)
+                        if(stat(dst, &statbuf) == 0)
+                        {
+                            if(statbuf.st_size != ptr->size)
                             {
                                 printf("Done, but file is not complete!\n");
                                 ok = 0;
@@ -74,11 +70,6 @@ int main(int a_c, char **a_v)
                         else
                         {
                             printf("Cannot stat file\n");
-                            ok = 0;
-                        }
-
-                        if(utime(dst, &utimbuf) != 0) {
-                            printf("failed to set file time (%s)\n", strerror(errno));
                             ok = 0;
                         }
                     }
