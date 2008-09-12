@@ -693,9 +693,9 @@ int puppy_hdd_file_put(puppy_t p, const char *srcPath, const char *dstPath)
                 break;
         }
     }
+  out:
     finalStats(byteCount, startTime);
 
-  out:
     close(src);
     return result;
 }
@@ -822,10 +822,10 @@ int puppy_hdd_file_get(puppy_t p, const char *srcPath, const char *dstPath)
                         get_u32(&reply.cmd));
         }
     }
+  out:
     utime(dstPath, &mod_utime_buf);
     finalStats(byteCount, startTime);
 
-  out:
     close(dst);
     return result;
 }
