@@ -88,7 +88,19 @@ int main(int a_c, char **a_v)
                         if(stat(dst, &statbuf) == 0 &&
                            statbuf.st_size == ptr->size)
                         {
-                            printf("File already transferred in full, skipping.\n");
+                            printf("File already transferred in full, ");
+                            if(move && !noact)
+                            {
+                                printf("removing source file.\n");
+                                if(puppy_hdd_del(p, src) != 0)
+                                {
+                                    printf("Cannot remove source file %s\n", dst);
+                                }
+                            }
+                            else
+                            {
+                                printf("skipping.\n");
+                            }
                         }
                         else 
                         {
