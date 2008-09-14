@@ -105,9 +105,9 @@ int main(int a_c, char **a_v)
                                         }
                                         else if(move && !noact)
                                         {
-                                            if(puppy_hdd_del(p, dst) != 0)
+                                            if(puppy_hdd_del(p, src) != 0)
                                             {
-                                                printf("Cannot remove destination file %s\n", dst);
+                                                printf("Cannot remove source file %s\n", dst);
                                             }
                                         }
                                     }
