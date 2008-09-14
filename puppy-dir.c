@@ -32,11 +32,12 @@ void usage(void)
     puts(" The default is to sort by name and time (-N)");
 }
 
-/* Given a file name like foo-123.rec, finds the start and end
-   pointers for 123
+/* Given a file name like foo-123.rec, find the length of "foo" and
+   retrieve the number 123. Given a file name like foo+1200-1300.rec, find
+   the length of "foo" and return nothing as the number.
 
    Maybe I should just use a regular expressions, this is overly
-   complicated versus the achieved results...
+   complicated versus the results achieved...
 */
 void extract_parts(const char  *a_name,
                    int         *a_name_len,
@@ -107,6 +108,9 @@ typedef enum compare_by_name_and {
     COMPARE_BY_TIME
 } compare_by_name_and_t;
 
+/* man, while I could use function pointers here also, it would be
+   easier so much nicer (especially with qsort) if there were closures
+   with lexical capture in C */
 int compare_by_name_and(compare_by_name_and_t a_secondary,
                         const puppy_dir_entry_t *a,
                         const puppy_dir_entry_t *b)
