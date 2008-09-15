@@ -54,6 +54,10 @@ typedef struct puppy *puppy_t;
 puppy_t puppy_open(const char *devPath);
 void puppy_done(puppy_t p);
 int puppy_ok(puppy_t p);
+
+// reading status will reset it to OK
+int puppy_status(puppy_t p);
+
 int puppy_turbo(puppy_t p, int state);
 int puppy_reset(puppy_t p);
 int puppy_ready(puppy_t p);

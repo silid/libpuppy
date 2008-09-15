@@ -91,6 +91,13 @@ int puppy_ok(puppy_t p)
     return p->error == 0;
 }
 
+int puppy_status(puppy_t p)
+{
+    int s = p->error;
+    p->error = 0;
+    return s == 0;
+}
+
 puppy_t puppy_open(const char *devPath)
 {
     puppy_t p = malloc(sizeof(struct puppy));
