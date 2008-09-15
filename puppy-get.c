@@ -1,5 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 
+#define _LARGEFILE64_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
