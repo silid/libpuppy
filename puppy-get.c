@@ -62,7 +62,8 @@ int main(int a_c, char **a_v)
         if(ok && puppy_ok(p))
         {
             char *dir = convert_slashes(a_v[optind]);
-            const char *glob = a_v[optind + 1];
+            char * const *globs = a_v + optind + 1;
+            int num_globs = a_v + a_c - globs;
 
             puppy_dir_entry_t *entries = puppy_hdd_dir(p, dir);
             puppy_dir_entry_t *ptr = entries;
@@ -75,68 +76,78 @@ int main(int a_c, char **a_v)
             {
                 while(ok && ptr->name[0])
                 {
-                    if(ptr->ftype == PUPPY_FILE &&
-                       fnmatch(glob, ptr->name, 0) == 0)
+                    if(ptr->ftype == PUPPY_FILE)
                     {
-                        char tmStr[1024];
-                        struct tm tm = *localtime(&ptr->time);
-                        char src[256];
-                        const char* dst = ptr->name;
-                        struct stat statbuf;
-
-                        snprintf(src, sizeof(src), "%s\\%s", dir, dst);
-                
-                        strftime(tmStr, sizeof(tmStr), "%Y-%m-%d %H:%M:%S", &tm);
-                        printf("%s %12lld %s\n", tmStr, ptr->size, dst);
-
-                        if(stat(dst, &statbuf) == 0 &&
-                           statbuf.st_size == ptr->size)
+                        int matches = 0;
                         {
-                            printf("File already transferred in full, ");
-                            if(move && !noact)
+                            int c;
+                            for (c = 0; c < num_globs && !matches; ++c)
                             {
-                                printf("removing source file.\n");
-                                if(puppy_hdd_del(p, src) != 0)
-                                {
-                                    printf("Cannot remove source file %s\n", dst);
-                                }
-                            }
-                            else
-                            {
-                                printf("skipping.\n");
+                                matches = fnmatch(globs[c], ptr->name, 0) == 0;
                             }
                         }
-                        else 
+                        if (matches)
                         {
-                            if(!noact)
+                            char tmStr[1024];
+                            struct tm tm = *localtime(&ptr->time);
+                            char src[256];
+                            const char* dst = ptr->name;
+                            struct stat statbuf;
+
+                            snprintf(src, sizeof(src), "%s\\%s", dir, dst);
+                
+                            strftime(tmStr, sizeof(tmStr), "%Y-%m-%d %H:%M:%S", &tm);
+                            printf("%s %12lld %s\n", tmStr, ptr->size, dst);
+
+                            if(stat(dst, &statbuf) == 0 &&
+                               statbuf.st_size == ptr->size)
                             {
-                                if(puppy_hdd_file_get(p, src, dst) == 0)
+                                printf("File already transferred in full, ");
+                                if(move && !noact)
                                 {
-                                    if(stat(dst, &statbuf) == 0)
+                                    printf("removing source file.\n");
+                                    if(puppy_hdd_del(p, src) != 0)
                                     {
-                                        if(statbuf.st_size != ptr->size)
-                                        {
-                                            printf("Done, but file is not complete!\n");
-                                            ok = 0;
-                                        }
-                                        else if(move && !noact)
-                                        {
-                                            if(puppy_hdd_del(p, src) != 0)
-                                            {
-                                                printf("Cannot remove source file %s\n", dst);
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        printf("Cannot stat file\n");
-                                        ok = 0;
+                                        printf("Cannot remove source file %s\n", dst);
                                     }
                                 }
                                 else
                                 {
-                                    printf("Cannot retrieve source file %s", src);
-                                    ok = 0;
+                                    printf("skipping.\n");
+                                }
+                            }
+                            else 
+                            {
+                                if(!noact)
+                                {
+                                    if(puppy_hdd_file_get(p, src, dst) == 0)
+                                    {
+                                        if(stat(dst, &statbuf) == 0)
+                                        {
+                                            if(statbuf.st_size != ptr->size)
+                                            {
+                                                printf("Done, but file is not complete!\n");
+                                                ok = 0;
+                                            }
+                                            else if(move && !noact)
+                                            {
+                                                if(puppy_hdd_del(p, src) != 0)
+                                                {
+                                                    printf("Cannot remove source file %s\n", dst);
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            printf("Cannot stat file\n");
+                                            ok = 0;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        printf("Cannot retrieve source file %s", src);
+                                        ok = 0;
+                                    }
                                 }
                             }
                         }
