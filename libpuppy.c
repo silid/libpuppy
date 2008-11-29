@@ -10,6 +10,8 @@
 
   Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
 
+  Copyright (C) 2008 Erkki Seppala <flux at modeemi.fi>
+
   This file is part of puppy.
 
   puppy is free software; you can redistribute it and/or modify

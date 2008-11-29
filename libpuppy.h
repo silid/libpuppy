@@ -6,9 +6,10 @@
 -bad -bap -bbb -i4 -bli0 -bl0 -cbi0 -cli4 -ss -npcs -nprs -nsaf -nsai -nsaw -nsc -nfca -nut -lp -npsl
 */
 
-/*
-
+/* 
   Copyright (C) 2004-2008 Peter Urbanec <toppy at urbanec.net>
+
+  Copyright (C) 2008 Erkki Seppala <flux at modeemi.fi>
 
   This file is part of puppy.
 
